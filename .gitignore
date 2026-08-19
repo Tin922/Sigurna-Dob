@@ -1,0 +1,25 @@
+# Build output
+**/bin/
+**/obj/
+
+# SQLite database (local dev only)
+*.db
+*.db-shm
+*.db-wal
+db-backups/
+**/db-backups/
+
+# Uploaded media from local testing
+**/wwwroot/uploads/
+
+# Local notes with demo passwords
+demo-korisnici.txt
+Instrucitons.md
+
+# Backup / IDE / tools
+Directory.Build.props.bak
+.dotnet-tools/
+.idea/
+
+# User secrets (never commit)
+**/secrets.json

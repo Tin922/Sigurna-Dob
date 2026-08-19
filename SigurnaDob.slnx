@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="SigurnaDob.Api/SigurnaDob.Api.csproj" />
+  <Project Path="SigurnaDob.App/SigurnaDob.App.csproj" />
+  <Project Path="SigurnaDob.Shared/SigurnaDob.Shared.csproj" />
+</Solution>

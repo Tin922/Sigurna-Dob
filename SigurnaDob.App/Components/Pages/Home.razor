@@ -1,0 +1,51 @@
+﻿@page "/"
+@inject HttpClient Http
+
+<PageTitle>Sigurna dob</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Sigurna dob</MudText>
+<MudText Typo="Typo.body1" Class="mb-4">
+    Skeleton aplikacije za finalni projekt — upravljanje domom za starije osobe.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (_apiStatus is not null)
+{
+    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
+        API status: @_apiStatus
+    </MudAlert>
+}
+else if (_apiError is not null)
+{
+    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+        API nije dostupan: @_apiError
+    </MudAlert>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _apiStatus;
+    private string? _apiError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<HealthResponse>("api/health");
+            _apiStatus = response?.Status;
+        }
+        catch (Exception ex)
+        {
+            _apiError = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private sealed record HealthResponse(string Status);
+}

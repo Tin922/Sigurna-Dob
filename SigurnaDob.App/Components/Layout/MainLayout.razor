@@ -1,0 +1,25 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudText Typo="Typo.h6">Sigurna dob</MudText>
+        <MudSpacer />
+        <MudText Typo="Typo.body2">Dom za starije osobe</MudText>
+    </MudAppBar>
+
+    <MudDrawer Open="true"
+               Elevation="1"
+               Variant="DrawerVariant.Responsive"
+               ClipMode="DrawerClipMode.Always">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="pa-6 mt-16">
+        @Body
+    </MudMainContent>
+</MudLayout>
