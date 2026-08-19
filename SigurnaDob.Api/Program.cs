@@ -1,9 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using SigurnaDob.Api.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<SigurnaDobDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var appOrigin = builder.Configuration["Cors:AppOrigin"]
                 ?? "https://localhost:7096";
