@@ -35,14 +35,12 @@ public static class ResidentBusinessRules
         if (room is null)
             return "Odabrana soba ne postoji.";
 
-        var occupancy = await db.Residents
-            .AsNoTracking()
-            .Where(resident =>
-                resident.RoomId == roomId &&
-                resident.ResidentStatusId != ResidentStatusIds.MovedOut &&
-                resident.ResidentStatusId != ResidentStatusIds.Archived &&
-                (excludeResidentId == null || resident.Id != excludeResidentId))
-            .CountAsync(cancellationToken);
+        var statusError = RoomBusinessRules.ValidateAvailableForAssignment(room.RoomStatusId);
+        if (statusError is not null)
+            return statusError;
+
+        var occupancy = await RoomBusinessRules.GetOccupancyAsync(
+            db, roomId, excludeResidentId, cancellationToken);
 
         if (occupancy >= room.Capacity)
             return $"Soba '{room.Name}' je popunjena (kapacitet {room.Capacity}).";

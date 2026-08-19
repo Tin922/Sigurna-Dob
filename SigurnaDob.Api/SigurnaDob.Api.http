@@ -41,3 +41,10 @@ Authorization: Bearer {{loginCoordinator.response.body.accessToken}}
 
 GET {{SigurnaDob.Api_HostAddress}}/api/residents/1
 Authorization: Bearer {{loginCoordinator.response.body.accessToken}}
+
+### Rooms
+GET {{SigurnaDob.Api_HostAddress}}/api/rooms
+Authorization: Bearer {{loginCoordinator.response.body.accessToken}}
+
+GET {{SigurnaDob.Api_HostAddress}}/api/rooms/1
+Authorization: Bearer {{loginCoordinator.response.body.accessToken}}
