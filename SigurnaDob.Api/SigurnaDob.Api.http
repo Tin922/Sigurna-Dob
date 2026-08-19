@@ -30,3 +30,14 @@ Content-Type: application/json
 GET {{SigurnaDob.Api_HostAddress}}/api/auth/me
 Authorization: Bearer {{loginAdmin.response.body.accessToken}}
 Accept: application/json
+
+### Lookups
+GET {{SigurnaDob.Api_HostAddress}}/api/lookups/resident-statuses
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
+
+### Residents
+GET {{SigurnaDob.Api_HostAddress}}/api/residents?search=mara&sortBy=lastName&sortDir=asc
+Authorization: Bearer {{loginCoordinator.response.body.accessToken}}
+
+GET {{SigurnaDob.Api_HostAddress}}/api/residents/1
+Authorization: Bearer {{loginCoordinator.response.body.accessToken}}
