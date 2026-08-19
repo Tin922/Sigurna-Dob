@@ -2,5 +2,31 @@
 
 @SigurnaDob.Api_HostAddress = https://localhost:7210
 
+### Anonymous
 GET {{SigurnaDob.Api_HostAddress}}/api/health
+Accept: application/json
+
+### Login — admin (no profile)
+# @name loginAdmin
+POST {{SigurnaDob.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@sigurna-dob.local",
+  "password": "Admin123!"
+}
+
+### Login — coordinator
+# @name loginCoordinator
+POST {{SigurnaDob.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "coordinator@sigurna-dob.local",
+  "password": "Coordinator123!"
+}
+
+### Current user (requires token)
+GET {{SigurnaDob.Api_HostAddress}}/api/auth/me
+Authorization: Bearer {{loginAdmin.response.body.accessToken}}
 Accept: application/json

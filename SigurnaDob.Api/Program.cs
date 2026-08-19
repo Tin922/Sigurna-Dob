@@ -1,5 +1,11 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using SigurnaDob.Api.Data;
+using SigurnaDob.Api.Security;
+using SigurnaDob.Shared.Constants;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +15,57 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<SigurnaDobDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
+var jwtOptions = jwtSection.Get<JwtOptions>()
+                 ?? throw new InvalidOperationException("Nedostaje Jwt konfiguracija.");
+
+if (jwtOptions.SigningKey.Length < 32)
+    throw new InvalidOperationException(
+        "Jwt:SigningKey mora imati najmanje 32 znaka.");
+
+builder.Services.Configure<JwtOptions>(jwtSection);
+builder.Services.AddScoped<JwtTokenService>();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+
+    options.AddPolicy(
+        AuthorizationPolicies.Staff,
+        policy => policy.RequireRole(
+            AppRoles.Admin,
+            AppRoles.Coordinator,
+            AppRoles.Caregiver));
+
+    options.AddPolicy(
+        AuthorizationPolicies.AdminOnly,
+        policy => policy.RequireRole(AppRoles.Admin));
+
+    options.AddPolicy(
+        AuthorizationPolicies.CoordinatorOrAdmin,
+        policy => policy.RequireRole(AppRoles.Admin, AppRoles.Coordinator));
+});
 
 var appOrigin = builder.Configuration["Cors:AppOrigin"]
                 ?? "https://localhost:7096";
@@ -27,6 +84,8 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SigurnaDobDbContext>();
     await db.Database.MigrateAsync();
+    await DemoDataSeeder.SeedAsync(db);
+    await AppUserSeeder.SeedAsync(db);
 }
 
 if (app.Environment.IsDevelopment())
@@ -38,6 +97,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors("BlazorApp");
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
