@@ -263,5 +263,65 @@ public class SigurnaDobDbContext : DbContext
             .WithMany(resident => resident.Media)
             .HasForeignKey(media => media.ResidentId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        SeedLookupData(modelBuilder);
+    }
+
+    private static void SeedLookupData(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ResidentStatus>().HasData(
+            new ResidentStatus { Id = 1, Name = "U pripremi za prijem" },
+            new ResidentStatus { Id = 2, Name = "Aktivan" },
+            new ResidentStatus { Id = 3, Name = "Privremeno odsutan" },
+            new ResidentStatus { Id = 4, Name = "Premješten iz doma" },
+            new ResidentStatus { Id = 5, Name = "Arhiviran" });
+
+        modelBuilder.Entity<RoomStatus>().HasData(
+            new RoomStatus { Id = 1, Name = "U uporabi" },
+            new RoomStatus { Id = 2, Name = "Održavanje" },
+            new RoomStatus { Id = 3, Name = "Izvan uporabe" });
+
+        modelBuilder.Entity<EmployeePosition>().HasData(
+            new EmployeePosition { Id = 1, Name = "Koordinator" },
+            new EmployeePosition { Id = 2, Name = "Njegovatelj" });
+
+        modelBuilder.Entity<EmployeeStatus>().HasData(
+            new EmployeeStatus { Id = 1, Name = "Aktivan" },
+            new EmployeeStatus { Id = 2, Name = "Neaktivan" });
+
+        modelBuilder.Entity<CareTaskType>().HasData(
+            new CareTaskType { Id = 1, Name = "Terapija" },
+            new CareTaskType { Id = 2, Name = "Prehrana" },
+            new CareTaskType { Id = 3, Name = "Higijena" },
+            new CareTaskType { Id = 4, Name = "Pratnja" },
+            new CareTaskType { Id = 5, Name = "Administrativno" });
+
+        modelBuilder.Entity<CareTaskStatus>().HasData(
+            new CareTaskStatus { Id = 1, Name = "Novo" },
+            new CareTaskStatus { Id = 2, Name = "Dodijeljeno" },
+            new CareTaskStatus { Id = 3, Name = "U tijeku" },
+            new CareTaskStatus { Id = 4, Name = "Izvršeno" },
+            new CareTaskStatus { Id = 5, Name = "Otkazano" });
+
+        modelBuilder.Entity<VisitRequestStatus>().HasData(
+            new VisitRequestStatus { Id = 1, Name = "Zaprimljeno" },
+            new VisitRequestStatus { Id = 2, Name = "Odobreno" },
+            new VisitRequestStatus { Id = 3, Name = "Odbijeno" },
+            new VisitRequestStatus { Id = 4, Name = "Održano" },
+            new VisitRequestStatus { Id = 5, Name = "Otkazano" });
+
+        modelBuilder.Entity<ActivityType>().HasData(
+            new ActivityType { Id = 1, Name = "Društvena" },
+            new ActivityType { Id = 2, Name = "Kreativna" },
+            new ActivityType { Id = 3, Name = "Tjelovježba" },
+            new ActivityType { Id = 4, Name = "Edukativna" },
+            new ActivityType { Id = 5, Name = "Izlet" });
+
+        modelBuilder.Entity<AppRole>().HasData(
+            new AppRole { Id = 1, Name = "User", DisplayName = "Korisnik" },
+            new AppRole { Id = 2, Name = "Admin", DisplayName = "Administrator" },
+            new AppRole { Id = 3, Name = "Coordinator", DisplayName = "Koordinator" },
+            new AppRole { Id = 4, Name = "Caregiver", DisplayName = "Njegovatelj" },
+            new AppRole { Id = 5, Name = "FamilyMember", DisplayName = "Član obitelji" });
     }
 }
