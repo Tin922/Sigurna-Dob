@@ -1,0 +1,225 @@
+@page "/my-visit-requests"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Moji zahtjevi za posjet</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Moji zahtjevi za posjet</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">Zatražite posjet i pratite status zahtjeva</MudText>
+</div>
+
+<MudPaper Class="pa-4 content-card mb-4" Elevation="0">
+    <MudText Typo="Typo.subtitle1" Class="mb-3">Novi zahtjev</MudText>
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudDatePicker @bind-Date="visitDate"
+                           Label="Datum posjeta"
+                           Variant="Variant.Outlined"
+                           MinDate="@DateTime.Today.AddDays(1)" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudTimePicker @bind-Time="visitTime"
+                           Label="Vrijeme"
+                           Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="SubmitRequest"
+                       Disabled="@isSubmitting">
+                Pošalji zahtjev
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@successMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="requests" Hover="true" Dense="true" Class="content-card" Elevation="0">
+        <HeaderContent>
+            <MudTh>Korisnik</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Poslano</MudTh>
+            <MudTh>Termin posjeta</MudTh>
+            <MudTh>Napomena</MudTh>
+            <MudTh>Akcije</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.ResidentName</MudTd>
+            <MudTd>@context.StatusName</MudTd>
+            <MudTd>@context.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+            <MudTd>@context.RequestedVisitAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+            <MudTd>@(context.DecisionNote ?? "—")</MudTd>
+            <MudTd>
+                @if (context.VisitRequestStatusId is VisitRequestStatusIds.Received or VisitRequestStatusIds.Approved)
+                {
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               OnClick="@(() => CancelRequest(context.Id))"
+                               Disabled="@(busyRequestId == context.Id)">
+                        Otkaži
+                    </MudButton>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption">—</MudText>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Još niste poslali nijedan zahtjev za posjet.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<VisitRequestDto> requests = new();
+    private DateTime? visitDate = DateTime.Today.AddDays(3);
+    private TimeSpan? visitTime = new TimeSpan(14, 0, 0);
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private int? busyRequestId;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.FamilyMember))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        if (CurrentUser.User?.FamilyContactId is null)
+        {
+            errorMessage = "Korisnički račun nije povezan s obiteljskim kontaktom.";
+            authReady = true;
+            isLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        authReady = true;
+        await LoadRequests();
+        StateHasChanged();
+    }
+
+    private async Task LoadRequests()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            requests = await Http.GetFromJsonAsync<List<VisitRequestDto>>("api/visitrequests/mine") ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Zahtjeve nije moguće učitati: {ex.Message}";
+            requests = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SubmitRequest()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (visitDate is null || visitTime is null)
+        {
+            errorMessage = "Odaberite datum i vrijeme posjeta.";
+            return;
+        }
+
+        var localVisitAt = visitDate.Value.Date + visitTime.Value;
+        var requestedVisitAt = DateTime.SpecifyKind(localVisitAt, DateTimeKind.Local).ToUniversalTime();
+
+        isSubmitting = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                "api/visitrequests/mine",
+                new SaveVisitRequestDto { RequestedVisitAt = requestedVisitAt });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Zahtjev za posjet je poslan.";
+            await LoadRequests();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task CancelRequest(int requestId)
+    {
+        busyRequestId = requestId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.PutAsync($"api/visitrequests/{requestId}/cancel", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Zahtjev je otkazan.";
+            await LoadRequests();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busyRequestId = null;
+        }
+    }
+}

@@ -1,0 +1,52 @@
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">@Prompt</MudText>
+        <MudTextField @bind-Value="decisionNote"
+                      @bind-Value:after="OnNoteChanged"
+                      Label="@NoteLabel"
+                      Lines="4"
+                      Required="@RequireNote"
+                      Immediate="true"
+                      Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Odustani</MudButton>
+        <MudButton Color="@ConfirmColor"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="@(!CanSubmit)">
+            @ConfirmText
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string Prompt { get; set; } = string.Empty;
+    [Parameter] public string NoteLabel { get; set; } = "Napomena";
+    [Parameter] public string ConfirmText { get; set; } = "Potvrdi";
+    [Parameter] public Color ConfirmColor { get; set; } = Color.Primary;
+    [Parameter] public bool RequireNote { get; set; }
+
+    private string decisionNote = string.Empty;
+
+    private bool CanSubmit => RequireNote
+        ? !string.IsNullOrWhiteSpace(decisionNote)
+        : true;
+
+    private void OnNoteChanged() => StateHasChanged();
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Submit()
+    {
+        if (!CanSubmit)
+            return;
+
+        var note = string.IsNullOrWhiteSpace(decisionNote) ? null : decisionNote.Trim();
+        MudDialog.Close(DialogResult.Ok(note));
+    }
+}

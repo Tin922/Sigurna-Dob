@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SigurnaDob.Shared.Constants;
 using SigurnaDob.Shared.Models;
 
 namespace SigurnaDob.Api.Data;
@@ -158,6 +159,54 @@ public static class DemoDataSeeder
                     CoordinatorId = coordinatorId,
                     CaregiverId = caregiverId,
                     DueAt = now.AddDays(-1)
+                });
+        }
+
+        if (!await db.VisitRequests.AnyAsync())
+        {
+            var residentId = await db.Residents.Select(resident => resident.Id).FirstAsync();
+            var familyContactId = await db.FamilyContacts.Select(contact => contact.Id).FirstAsync();
+            var coordinatorId = await db.Employees
+                .Where(employee => employee.EmployeeCode == "EMP-001")
+                .Select(employee => employee.Id)
+                .FirstAsync();
+
+            var now = DateTime.UtcNow;
+
+            db.VisitRequests.AddRange(
+                new VisitRequest
+                {
+                    ResidentId = residentId,
+                    FamilyContactId = familyContactId,
+                    VisitRequestStatusId = VisitRequestStatusIds.Received,
+                    RequestedAt = now.AddDays(-1),
+                    RequestedVisitAt = now.AddDays(3),
+                    UpdatedAt = now.AddDays(-1)
+                },
+                new VisitRequest
+                {
+                    ResidentId = residentId,
+                    FamilyContactId = familyContactId,
+                    VisitRequestStatusId = VisitRequestStatusIds.Approved,
+                    CoordinatorId = coordinatorId,
+                    RequestedAt = now.AddDays(-5),
+                    RequestedVisitAt = now.AddDays(5),
+                    DecidedAt = now.AddDays(-4),
+                    DecisionNote = "Termin potvrđen za posjet u dvorištu.",
+                    UpdatedAt = now.AddDays(-4)
+                },
+                new VisitRequest
+                {
+                    ResidentId = residentId,
+                    FamilyContactId = familyContactId,
+                    VisitRequestStatusId = VisitRequestStatusIds.Held,
+                    CoordinatorId = coordinatorId,
+                    RequestedAt = now.AddDays(-14),
+                    RequestedVisitAt = now.AddDays(-7),
+                    DecidedAt = now.AddDays(-10),
+                    HeldAt = now.AddDays(-7),
+                    DecisionNote = "Posjet održan bez poteškoća.",
+                    UpdatedAt = now.AddDays(-7)
                 });
         }
 

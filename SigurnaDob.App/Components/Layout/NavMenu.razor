@@ -55,6 +55,17 @@
                     <MudNavLink Href="/care-tasks" Icon="@Icons.Material.Filled.Assignment">
                         Zadaci skrbi
                     </MudNavLink>
+
+                    <MudNavLink Href="/visit-requests" Icon="@Icons.Material.Filled.EventAvailable">
+                        Zahtjevi za posjet
+                    </MudNavLink>
+                }
+
+                @if (CurrentUser.HasAnyRole(AppRoles.FamilyMember))
+                {
+                    <MudNavLink Href="/my-visit-requests" Icon="@Icons.Material.Filled.FamilyRestroom">
+                        Moji posjeti
+                    </MudNavLink>
                 }
 
                 @if (CurrentUser.HasAnyRole(AppRoles.Caregiver))

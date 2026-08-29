@@ -1,0 +1,311 @@
+@page "/visit-requests"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.WebUtilities
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Zahtjevi za posjet</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Zahtjevi za posjet</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">Pregled i odlučivanje o obiteljskim posjetima</MudText>
+</div>
+
+<MudPaper Class="pa-4 filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="search"
+                          Label="Pretraži"
+                          Placeholder="Korisnik ili obitelj"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       Label="Status"
+                       @bind-Value="statusId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)status.Id)">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       Label="Korisnik doma"
+                       @bind-Value="residentId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var resident in residents)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)resident.Id)">@resident.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadRequests">
+                Primijeni
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetFilters">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@successMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="requests" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+        <HeaderContent>
+            <MudTh>Korisnik</MudTh>
+            <MudTh>Obiteljski kontakt</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Zatraženo</MudTh>
+            <MudTh>Termin posjeta</MudTh>
+            <MudTh>Napomena</MudTh>
+            <MudTh>Akcije</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.ResidentName</MudTd>
+            <MudTd>@context.FamilyContactName</MudTd>
+            <MudTd>@context.StatusName</MudTd>
+            <MudTd>@context.RequestedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+            <MudTd>@context.RequestedVisitAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+            <MudTd>@(context.DecisionNote ?? "—")</MudTd>
+            <MudTd>
+                @if (context.VisitRequestStatusId == VisitRequestStatusIds.Received)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="@(() => ApproveRequest(context))"
+                               Disabled="@(busyRequestId == context.Id)"
+                               Class="mr-1">
+                        Odobri
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Error"
+                               Size="Size.Small"
+                               OnClick="@(() => RejectRequest(context))"
+                               Disabled="@(busyRequestId == context.Id)">
+                        Odbij
+                    </MudButton>
+                }
+                else if (context.VisitRequestStatusId == VisitRequestStatusIds.Approved)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               OnClick="@(() => MarkHeld(context.Id))"
+                               Disabled="@(busyRequestId == context.Id)"
+                               Class="mr-1">
+                        Održano
+                    </MudButton>
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               OnClick="@(() => CancelRequest(context.Id))"
+                               Disabled="@(busyRequestId == context.Id)">
+                        Otkaži
+                    </MudButton>
+                }
+                else if (context.VisitRequestStatusId is not (
+                    VisitRequestStatusIds.Held or VisitRequestStatusIds.Cancelled))
+                {
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Default"
+                               Size="Size.Small"
+                               OnClick="@(() => CancelRequest(context.Id))"
+                               Disabled="@(busyRequestId == context.Id)">
+                        Otkaži
+                    </MudButton>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption">—</MudText>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema zahtjeva za zadane filtere.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<VisitRequestDto> requests = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> residents = new();
+    private string? search;
+    private int? statusId;
+    private int? residentId;
+    private bool isLoading = true;
+    private int? busyRequestId;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        authReady = true;
+        await LoadLookups();
+        await LoadRequests();
+        StateHasChanged();
+    }
+
+    private async Task LoadLookups()
+    {
+        statuses = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/visit-request-statuses") ?? new();
+        residents = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/residents") ?? new();
+    }
+
+    private async Task LoadRequests()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var query = new Dictionary<string, string?>();
+            if (!string.IsNullOrWhiteSpace(search))
+                query["search"] = search.Trim();
+            if (statusId.HasValue)
+                query["statusId"] = statusId.Value.ToString();
+            if (residentId.HasValue)
+                query["residentId"] = residentId.Value.ToString();
+            query["sortBy"] = "requestedVisitAt";
+            query["sortDir"] = "asc";
+
+            var url = QueryHelpers.AddQueryString("api/visitrequests", query);
+            requests = await Http.GetFromJsonAsync<List<VisitRequestDto>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Zahtjeve nije moguće učitati: {ex.Message}";
+            requests = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        search = null;
+        statusId = null;
+        residentId = null;
+        await LoadRequests();
+    }
+
+    private async Task ApproveRequest(VisitRequestDto request)
+    {
+        var parameters = new DialogParameters<VisitDecisionDialog>
+        {
+            { x => x.Prompt, $"Odobri posjet za {request.FamilyContactName} ({request.RequestedVisitAt.ToLocalTime():dd.MM.yyyy HH:mm})" },
+            { x => x.NoteLabel, "Napomena (opcionalno)" },
+            { x => x.ConfirmText, "Odobri" },
+            { x => x.ConfirmColor, Color.Success },
+            { x => x.RequireNote, false }
+        };
+
+        var dialog = await DialogService.ShowAsync<VisitDecisionDialog>("Odobri posjet", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled)
+            return;
+
+        var note = result.Data as string;
+        await SendAction(request.Id, "approve", new DecideVisitRequestDto { DecisionNote = note }, "Zahtjev je odobren.");
+    }
+
+    private async Task RejectRequest(VisitRequestDto request)
+    {
+        var parameters = new DialogParameters<VisitDecisionDialog>
+        {
+            { x => x.Prompt, $"Odbij posjet za {request.FamilyContactName} ({request.RequestedVisitAt.ToLocalTime():dd.MM.yyyy HH:mm})" },
+            { x => x.NoteLabel, "Razlog odbijanja (opcionalno)" },
+            { x => x.ConfirmText, "Odbij" },
+            { x => x.ConfirmColor, Color.Error },
+            { x => x.RequireNote, false }
+        };
+
+        var dialog = await DialogService.ShowAsync<VisitDecisionDialog>("Odbij posjet", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled)
+            return;
+
+        var note = result.Data as string;
+        await SendAction(request.Id, "reject", new DecideVisitRequestDto { DecisionNote = note }, "Zahtjev je odbijen.");
+    }
+
+    private Task MarkHeld(int requestId) =>
+        SendAction(requestId, "held", null, "Posjet je označen kao održan.");
+
+    private Task CancelRequest(int requestId) =>
+        SendAction(requestId, "cancel", null, "Zahtjev je otkazan.");
+
+    private async Task SendAction(int requestId, string action, DecideVisitRequestDto? body, string successText)
+    {
+        busyRequestId = requestId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            HttpResponseMessage response = body is null
+                ? await Http.PutAsync($"api/visitrequests/{requestId}/{action}", null)
+                : await Http.PutAsJsonAsync($"api/visitrequests/{requestId}/{action}", body);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = successText;
+            await LoadRequests();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busyRequestId = null;
+        }
+    }
+}
