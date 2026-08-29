@@ -1,0 +1,158 @@
+@page "/care-tasks/create"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Novi zadatak skrbi</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Novi zadatak skrbi</MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+<MudStack Spacing="2" Style="max-width: 560px">
+    <MudTextField @bind-Value="model.Title" Label="Naslov" Required="true" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="model.Description" Label="Opis" Lines="3" Variant="Variant.Outlined" />
+
+    <MudSelect T="int"
+               Label="Korisnik doma"
+               @bind-Value="model.ResidentId"
+               Variant="Variant.Outlined"
+               Required="true">
+        @foreach (var resident in residents)
+        {
+            <MudSelectItem Value="@resident.Id">@resident.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="int"
+               Label="Vrsta zadatka"
+               @bind-Value="model.CareTaskTypeId"
+               Variant="Variant.Outlined"
+               Required="true">
+        @foreach (var type in types)
+        {
+            <MudSelectItem Value="@type.Id">@type.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="int?"
+               Label="Njegovatelj"
+               @bind-Value="model.CaregiverId"
+               Variant="Variant.Outlined"
+               Clearable="true">
+        @foreach (var caregiver in caregivers)
+        {
+            <MudSelectItem T="int?" Value="@((int?)caregiver.Id)">@caregiver.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudDatePicker @bind-Date="dueDate" Label="Rok (datum)" Variant="Variant.Outlined" />
+    <MudTimePicker @bind-Time="dueTime" Label="Rok (vrijeme)" Variant="Variant.Outlined" />
+
+    <MudCheckBox @bind-Value="cancelOnCreate"
+                 Label="Kreiraj kao otkazano"
+                 Color="Color.Warning" />
+
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+            @(isSaving ? "Spremanje..." : "Spremi")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Href="/care-tasks">Odustani</MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    private SaveCareTaskDto model = new()
+    {
+        CareTaskTypeId = 1,
+        CareTaskStatusId = CareTaskStatusIds.New
+    };
+    private List<LookupDto> residents = new();
+    private List<LookupDto> types = new();
+    private List<LookupDto> caregivers = new();
+    private DateTime? dueDate;
+    private TimeSpan? dueTime;
+    private bool cancelOnCreate;
+    private bool isSaving;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/care-tasks");
+            return;
+        }
+
+        authReady = true;
+        residents = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/residents") ?? new();
+        types = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/care-task-types") ?? new();
+        caregivers = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/caregivers") ?? new();
+
+        if (residents.Count > 0)
+            model.ResidentId = residents[0].Id;
+
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            model.DueAt = BuildDueAt();
+            model.CareTaskStatusId = cancelOnCreate
+                ? CareTaskStatusIds.Cancelled
+                : CareTaskStatusIds.New;
+
+            var response = await Http.PostAsJsonAsync("api/caretasks", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo("/care-tasks");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private DateTime? BuildDueAt()
+    {
+        if (!dueDate.HasValue)
+            return null;
+
+        var time = dueTime ?? TimeSpan.FromHours(12);
+        var local = DateTime.SpecifyKind(dueDate.Value.Date + time, DateTimeKind.Local);
+        return local.ToUniversalTime();
+    }
+}

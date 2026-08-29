@@ -1,0 +1,214 @@
+@page "/care-tasks"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.WebUtilities
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Zadaci skrbi</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Zadaci skrbi</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">Planiranje i dodjela zadataka njegovateljima</MudText>
+</div>
+
+<MudButton Variant="Variant.Filled"
+           Color="Color.Primary"
+           Href="/care-tasks/create"
+           Class="mb-4"
+           StartIcon="@Icons.Material.Filled.Add">
+    Novi zadatak
+</MudButton>
+
+<MudPaper Class="pa-4 filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="search"
+                          Label="Pretraži"
+                          Placeholder="Naslov ili korisnik"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       Label="Status"
+                       @bind-Value="statusId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)status.Id)">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="int?"
+                       Label="Vrsta"
+                       @bind-Value="typeId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var type in types)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)type.Id)">@type.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       Label="Njegovatelj"
+                       @bind-Value="caregiverId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var caregiver in caregivers)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)caregiver.Id)">@caregiver.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadTasks">
+                Primijeni
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetFilters">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="tasks" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+        <HeaderContent>
+            <MudTh>Zadatak</MudTh>
+            <MudTh>Korisnik</MudTh>
+            <MudTh>Vrsta</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Njegovatelj</MudTh>
+            <MudTh>Rok</MudTh>
+            <MudTh>Akcije</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @context.Title
+                @if (context.IsOverdue)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined" Class="ml-1">
+                        Kasni
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd>@context.ResidentName</MudTd>
+            <MudTd>@context.TypeName</MudTd>
+            <MudTd>@context.StatusName</MudTd>
+            <MudTd>@(context.CaregiverName ?? "—")</MudTd>
+            <MudTd>@(context.DueAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Primary"
+                           Href="@($"/care-tasks/edit/{context.Id}")">
+                    Uredi
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema zadataka za zadane filtere.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<CareTaskDto> tasks = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> types = new();
+    private List<LookupDto> caregivers = new();
+    private string? search;
+    private int? statusId;
+    private int? typeId;
+    private int? caregiverId;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        authReady = true;
+        await LoadLookups();
+        await LoadTasks();
+        StateHasChanged();
+    }
+
+    private async Task LoadLookups()
+    {
+        statuses = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/care-task-statuses") ?? new();
+        types = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/care-task-types") ?? new();
+        caregivers = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/caregivers") ?? new();
+    }
+
+    private async Task LoadTasks()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var query = new Dictionary<string, string?>();
+            if (!string.IsNullOrWhiteSpace(search))
+                query["search"] = search.Trim();
+            if (statusId.HasValue)
+                query["statusId"] = statusId.Value.ToString();
+            if (typeId.HasValue)
+                query["typeId"] = typeId.Value.ToString();
+            if (caregiverId.HasValue)
+                query["caregiverId"] = caregiverId.Value.ToString();
+            query["sortBy"] = "dueAt";
+            query["sortDir"] = "asc";
+
+            var url = QueryHelpers.AddQueryString("api/caretasks", query);
+            tasks = await Http.GetFromJsonAsync<List<CareTaskDto>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Zadatke nije moguće učitati: {ex.Message}";
+            tasks = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        search = null;
+        statusId = null;
+        typeId = null;
+        caregiverId = null;
+        await LoadTasks();
+    }
+}

@@ -49,6 +49,20 @@
                         Sobe
                     </MudNavLink>
                 }
+
+                @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+                {
+                    <MudNavLink Href="/care-tasks" Icon="@Icons.Material.Filled.Assignment">
+                        Zadaci skrbi
+                    </MudNavLink>
+                }
+
+                @if (CurrentUser.HasAnyRole(AppRoles.Caregiver))
+                {
+                    <MudNavLink Href="/my-care-tasks" Icon="@Icons.Material.Filled.TaskAlt">
+                        Moji zadaci
+                    </MudNavLink>
+                }
             </MudNavMenu>
         </div>
 

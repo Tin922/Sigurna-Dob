@@ -78,4 +78,34 @@ public class LookupsController : ControllerBase
             .OrderBy(item => item.Name)
             .Select(item => new LookupDto { Id = item.Id, Name = item.Name })
             .ToListAsync());
+
+    [HttpGet("caregivers")]
+    public async Task<ActionResult<List<LookupDto>>> GetCaregivers() =>
+        Ok(await _context.Employees
+            .Where(employee =>
+                employee.EmployeePositionId == 2 &&
+                employee.EmployeeStatusId == 1)
+            .OrderBy(employee => employee.LastName)
+            .ThenBy(employee => employee.FirstName)
+            .Select(employee => new LookupDto
+            {
+                Id = employee.Id,
+                Name = employee.FirstName + " " + employee.LastName
+            })
+            .ToListAsync());
+
+    [HttpGet("residents")]
+    public async Task<ActionResult<List<LookupDto>>> GetResidents() =>
+        Ok(await _context.Residents
+            .Where(resident =>
+                resident.ResidentStatusId != Shared.Constants.ResidentStatusIds.MovedOut &&
+                resident.ResidentStatusId != Shared.Constants.ResidentStatusIds.Archived)
+            .OrderBy(resident => resident.LastName)
+            .ThenBy(resident => resident.FirstName)
+            .Select(resident => new LookupDto
+            {
+                Id = resident.Id,
+                Name = resident.FirstName + " " + resident.LastName
+            })
+            .ToListAsync());
 }

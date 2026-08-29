@@ -85,5 +85,82 @@ public static class DemoDataSeeder
         }
 
         await db.SaveChangesAsync();
+
+        if (!await db.CareTasks.AnyAsync())
+        {
+            var residentId = await db.Residents.Select(resident => resident.Id).FirstAsync();
+            var coordinatorId = await db.Employees
+                .Where(employee => employee.EmployeeCode == "EMP-001")
+                .Select(employee => employee.Id)
+                .FirstAsync();
+            var caregiverId = await db.Employees
+                .Where(employee => employee.EmployeeCode == "EMP-002")
+                .Select(employee => employee.Id)
+                .FirstAsync();
+
+            var now = DateTime.UtcNow;
+
+            db.CareTasks.AddRange(
+                new CareTask
+                {
+                    Title = "Jutarnja terapija",
+                    Description = "Davanje jutarnih lijekova.",
+                    ResidentId = residentId,
+                    CareTaskTypeId = 1,
+                    CareTaskStatusId = 1,
+                    CoordinatorId = coordinatorId,
+                    DueAt = now.AddHours(8)
+                },
+                new CareTask
+                {
+                    Title = "Pomoć pri obroku",
+                    Description = "Ručak u blagovaonici.",
+                    ResidentId = residentId,
+                    CareTaskTypeId = 2,
+                    CareTaskStatusId = 2,
+                    CoordinatorId = coordinatorId,
+                    CaregiverId = caregiverId,
+                    DueAt = now.AddHours(4)
+                },
+                new CareTask
+                {
+                    Title = "Higijena i odjeća",
+                    Description = "Priprema odjeće za popodnevni odlazak.",
+                    ResidentId = residentId,
+                    CareTaskTypeId = 3,
+                    CareTaskStatusId = 3,
+                    CoordinatorId = coordinatorId,
+                    CaregiverId = caregiverId,
+                    StartedAt = now.AddHours(-1),
+                    DueAt = now.AddHours(2)
+                },
+                new CareTask
+                {
+                    Title = "Popodnevna šetnja",
+                    Description = "Kratka šetnja u dvorištu.",
+                    ResidentId = residentId,
+                    CareTaskTypeId = 4,
+                    CareTaskStatusId = 4,
+                    CoordinatorId = coordinatorId,
+                    CaregiverId = caregiverId,
+                    StartedAt = now.AddDays(-1),
+                    CompletedAt = now.AddDays(-1).AddHours(1),
+                    CompletionNote = "Šetnja odrađena bez poteškoća.",
+                    DueAt = now.AddDays(-1)
+                },
+                new CareTask
+                {
+                    Title = "Administrativni upit",
+                    Description = "Kontakt s obitelji oko posjeta.",
+                    ResidentId = residentId,
+                    CareTaskTypeId = 5,
+                    CareTaskStatusId = 2,
+                    CoordinatorId = coordinatorId,
+                    CaregiverId = caregiverId,
+                    DueAt = now.AddDays(-1)
+                });
+        }
+
+        await db.SaveChangesAsync();
     }
 }

@@ -1,0 +1,216 @@
+@page "/my-care-tasks"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Moji zadaci</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Moji zadaci</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">Zadaci dodijeljeni prijavljenom njegovatelju</MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@successMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="tasks" Hover="true" Dense="true" Class="content-card" Elevation="0">
+        <HeaderContent>
+            <MudTh>Zadatak</MudTh>
+            <MudTh>Korisnik</MudTh>
+            <MudTh>Vrsta</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Rok</MudTh>
+            <MudTh>Akcije</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @context.Title
+                @if (context.IsOverdue)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined" Class="ml-1">
+                        Kasni
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd>@context.ResidentName</MudTd>
+            <MudTd>@context.TypeName</MudTd>
+            <MudTd>@context.StatusName</MudTd>
+            <MudTd>@(context.DueAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudTd>
+            <MudTd>
+                @if (context.CareTaskStatusId == CareTaskStatusIds.Assigned)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               OnClick="@(() => StartTask(context.Id))"
+                               Disabled="@(busyTaskId == context.Id)">
+                        Pokreni
+                    </MudButton>
+                }
+                else if (context.CareTaskStatusId == CareTaskStatusIds.InProgress)
+                {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Secondary"
+                               Size="Size.Small"
+                               OnClick="@(() => CompleteTask(context))"
+                               Disabled="@(busyTaskId == context.Id)">
+                        Završi
+                    </MudButton>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption">—</MudText>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Trenutačno nema dodijeljenih zadataka.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<CareTaskDto> tasks = new();
+    private bool isLoading = true;
+    private int? busyTaskId;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Caregiver))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        if (CurrentUser.User?.EmployeeId is null)
+        {
+            errorMessage = "Korisnički račun nije povezan s djelatnikom.";
+            authReady = true;
+            isLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        authReady = true;
+        await LoadTasks();
+        StateHasChanged();
+    }
+
+    private async Task LoadTasks()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            tasks = await Http.GetFromJsonAsync<List<CareTaskDto>>("api/caretasks/mine") ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Zadatke nije moguće učitati: {ex.Message}";
+            tasks = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task StartTask(int taskId)
+    {
+        busyTaskId = taskId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.PutAsync($"api/caretasks/{taskId}/start", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Zadatak je pokrenut.";
+            await LoadTasks();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busyTaskId = null;
+        }
+    }
+
+    private async Task CompleteTask(CareTaskDto task)
+    {
+        var parameters = new DialogParameters<TaskCompleteDialog>
+        {
+            { x => x.TaskTitle, task.Title }
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskCompleteDialog>("Završi zadatak", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not string note)
+            return;
+
+        busyTaskId = task.Id;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/caretasks/{task.Id}/complete",
+                new CompleteCareTaskDto { CompletionNote = note });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Zadatak je označen kao izvršen.";
+            await LoadTasks();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busyTaskId = null;
+        }
+    }
+}
