@@ -58,7 +58,7 @@
 </div>
 
 @code {
-    private LoginRequestDto model = new();
+    private LoginRequestDto model = new() { Email = string.Empty, Password = string.Empty };
     private string? errorMessage;
     private bool isSaving;
 

@@ -1,0 +1,226 @@
+@page "/residents/{ResidentId:int}/family-contacts/edit/{ContactId:int}"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Uredi obiteljski kontakt</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Uredi obiteljski kontakt</MudText>
+    @if (!string.IsNullOrWhiteSpace(residentName))
+    {
+        <MudText Typo="Typo.body2" Class="page-subtitle">Korisnik: @residentName</MudText>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@successMessage</MudAlert>
+}
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudStack Spacing="2" Style="max-width: 560px">
+        <MudTextField @bind-Value="model.FirstName" Label="Ime" Required="true" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.LastName" Label="Prezime" Required="true" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.Relationship" Label="Srodstvo" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.Phone" Label="Telefon" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.Email" Label="Email" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.Note"
+                      Label="Bilješka"
+                      Lines="3"
+                      Variant="Variant.Outlined" />
+
+        @if (hasLinkedAccount)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+                Kontakt ima povezan portal račun za prijavu.
+            </MudAlert>
+        }
+        else if (!string.IsNullOrWhiteSpace(model.Email))
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                Portal račun još nije kreiran. Kontakt je samo evidencija dok ne kreirate račun za prijavu.
+            </MudAlert>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       OnClick="CreatePortalAccount"
+                       Disabled="isCreatingAccount">
+                @(isCreatingAccount ? "Kreiranje..." : "Kreiraj portal račun")
+            </MudButton>
+            <MudText Typo="Typo.caption" Class="mt-1">Početna lozinka: Family123!</MudText>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                Unesite email i spremite kontakt prije kreiranja portal računa.
+            </MudAlert>
+        }
+
+        <MudStack Row="true" Spacing="2" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+                @(isSaving ? "Spremanje..." : "Spremi promjene")
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Href="@($"/residents/{ResidentId}")">Odustani</MudButton>
+        </MudStack>
+    </MudStack>
+}
+
+@code {
+    [Parameter] public int ResidentId { get; set; }
+    [Parameter] public int ContactId { get; set; }
+
+    private SaveFamilyContactDto model = new();
+    private string residentName = string.Empty;
+    private bool hasLinkedAccount;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isCreatingAccount;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo($"/residents/{ResidentId}");
+            return;
+        }
+
+        authReady = true;
+        await LoadContact();
+        StateHasChanged();
+    }
+
+    private async Task LoadContact()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var contact = await Http.GetFromJsonAsync<FamilyContactDetailDto>($"api/familycontacts/{ContactId}");
+            if (contact is null)
+            {
+                errorMessage = "Kontakt nije pronađen.";
+                return;
+            }
+
+            if (contact.ResidentId != ResidentId)
+            {
+                Navigation.NavigateTo($"/residents/{contact.ResidentId}/family-contacts/edit/{ContactId}");
+                return;
+            }
+
+            residentName = contact.ResidentName;
+            hasLinkedAccount = contact.HasLinkedAccount;
+            model = new SaveFamilyContactDto
+            {
+                FirstName = contact.FirstName,
+                LastName = contact.LastName,
+                Relationship = contact.Relationship,
+                Phone = contact.Phone,
+                Email = contact.Email,
+                Note = contact.Note,
+                ResidentId = contact.ResidentId
+            };
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        successMessage = null;
+        isSaving = true;
+
+        try
+        {
+            model.ResidentId = ResidentId;
+
+            var response = await Http.PutAsJsonAsync($"api/familycontacts/{ContactId}", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo($"/residents/{ResidentId}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task CreatePortalAccount()
+    {
+        errorMessage = null;
+        successMessage = null;
+        isCreatingAccount = true;
+
+        try
+        {
+            var response = await Http.PostAsync($"api/familycontacts/{ContactId}/portal-account", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Portal račun nije mogao biti kreiran.";
+                return;
+            }
+
+            var contact = await response.Content.ReadFromJsonAsync<FamilyContactDetailDto>();
+            if (contact is not null)
+            {
+                hasLinkedAccount = contact.HasLinkedAccount;
+                model.Email = contact.Email;
+            }
+
+            successMessage = "Portal račun je kreiran. Prijava: email kontakta, lozinka Family123!";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isCreatingAccount = false;
+        }
+    }
+}

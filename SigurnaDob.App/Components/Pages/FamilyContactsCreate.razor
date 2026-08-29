@@ -1,0 +1,146 @@
+@page "/residents/{ResidentId:int}/family-contacts/create"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Novi obiteljski kontakt</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Novi obiteljski kontakt</MudText>
+    @if (!string.IsNullOrWhiteSpace(residentName))
+    {
+        <MudText Typo="Typo.body2" Class="page-subtitle">Korisnik: @residentName</MudText>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudStack Spacing="2" Style="max-width: 560px">
+        <MudTextField @bind-Value="model.FirstName" Label="Ime" Required="true" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.LastName" Label="Prezime" Required="true" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.Relationship" Label="Srodstvo" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.Phone" Label="Telefon" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.Email" Label="Email" Variant="Variant.Outlined" />
+
+        @if (!string.IsNullOrWhiteSpace(model.Email))
+        {
+            <MudCheckBox @bind-Value="model.CreatePortalAccount"
+                         Label="Kreiraj portal račun za prijavu (lozinka: Family123!)"
+                         Color="Color.Primary" />
+        }
+
+        <MudTextField @bind-Value="model.Note"
+                      Label="Bilješka"
+                      Lines="3"
+                      Variant="Variant.Outlined" />
+
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+                @(isSaving ? "Spremanje..." : "Spremi")
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Href="@($"/residents/{ResidentId}")">Odustani</MudButton>
+        </MudStack>
+    </MudStack>
+}
+
+@code {
+    [Parameter] public int ResidentId { get; set; }
+
+    private SaveFamilyContactDto model = new();
+    private string residentName = string.Empty;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo($"/residents/{ResidentId}");
+            return;
+        }
+
+        authReady = true;
+        await LoadResident();
+        StateHasChanged();
+    }
+
+    private async Task LoadResident()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var resident = await Http.GetFromJsonAsync<ResidentDetailDto>($"api/residents/{ResidentId}");
+            if (resident is null)
+            {
+                errorMessage = "Korisnik nije pronađen.";
+                return;
+            }
+
+            residentName = $"{resident.FirstName} {resident.LastName}";
+            model = new SaveFamilyContactDto { ResidentId = ResidentId };
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            model.ResidentId = ResidentId;
+
+            var response = await Http.PostAsJsonAsync("api/familycontacts", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo($"/residents/{ResidentId}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

@@ -27,9 +27,7 @@ public class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("login")]
-    [Consumes("application/json")]
-    [Produces("application/json")]
-    public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto request)
+    public async Task<ActionResult<LoginResponseDto>> Login(LoginRequestDto request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
 

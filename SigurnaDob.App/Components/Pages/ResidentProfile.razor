@@ -1,6 +1,7 @@
 @page "/residents/{Id:int}"
 @rendermode InteractiveServer
 
+@using Microsoft.AspNetCore.WebUtilities
 @using SigurnaDob.App.Services
 @using SigurnaDob.Shared.Constants
 @using SigurnaDob.Shared.Dtos
@@ -52,10 +53,83 @@ else
             <MudPaper Class="pa-4">
                 <MudText Typo="Typo.subtitle1" Class="mb-2">Bilješka</MudText>
                 <MudText Typo="Typo.body2">@(string.IsNullOrWhiteSpace(resident.Note) ? "—" : resident.Note)</MudText>
-                <MudText Typo="Typo.body2" Class="mt-3"><b>Obiteljski kontakti:</b> @resident.FamilyContactCount</MudText>
             </MudPaper>
         </MudItem>
     </MudGrid>
+
+    <MudPaper Class="pa-4 mt-4 content-card" Elevation="0">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.subtitle1">Obiteljski kontakti</MudText>
+            @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+            {
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Secondary"
+                           Href="@($"/residents/{Id}/family-contacts/create")"
+                           StartIcon="@Icons.Material.Filled.Add">
+                    Novi kontakt
+                </MudButton>
+            }
+        </MudStack>
+
+        @if (!string.IsNullOrWhiteSpace(contactsErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3">@contactsErrorMessage</MudAlert>
+        }
+
+        @if (isLoadingContacts)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else
+        {
+            <MudTable Items="familyContacts" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Ime i prezime</MudTh>
+                    <MudTh>Srodstvo</MudTh>
+                    <MudTh>Telefon</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Portal račun</MudTh>
+                    @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+                    {
+                        <MudTh>Akcije</MudTh>
+                    }
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.FirstName @context.LastName</MudTd>
+                    <MudTd>@(context.Relationship ?? "—")</MudTd>
+                    <MudTd>@(context.Phone ?? "—")</MudTd>
+                    <MudTd>@(context.Email ?? "—")</MudTd>
+                    <MudTd>
+                        @if (context.HasLinkedAccount)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                                Ima račun
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                                Nema računa
+                            </MudChip>
+                        }
+                    </MudTd>
+                    @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+                    {
+                        <MudTd>
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       Href="@($"/residents/{Id}/family-contacts/edit/{context.Id}")">
+                                Uredi
+                            </MudButton>
+                        </MudTd>
+                    }
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Class="pa-4">Nema obiteljskih kontakata za ovog korisnika.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
+    </MudPaper>
 
     <MudButton Href="/residents" Variant="Variant.Text" Class="mt-4">← Natrag na popis</MudButton>
 }
@@ -64,7 +138,10 @@ else
     [Parameter] public int Id { get; set; }
 
     private ResidentDetailDto? resident;
+    private List<FamilyContactDto> familyContacts = new();
     private bool isLoading = true;
+    private bool isLoadingContacts = true;
+    private string? contactsErrorMessage;
     private bool authReady;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -83,7 +160,32 @@ else
 
         authReady = true;
         await LoadResident();
+        await LoadFamilyContacts();
         StateHasChanged();
+    }
+
+    private async Task LoadFamilyContacts()
+    {
+        isLoadingContacts = true;
+        contactsErrorMessage = null;
+
+        try
+        {
+            var url = QueryHelpers.AddQueryString(
+                "api/familycontacts",
+                new Dictionary<string, string?> { ["residentId"] = Id.ToString() });
+
+            familyContacts = await Http.GetFromJsonAsync<List<FamilyContactDto>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            contactsErrorMessage = $"Kontakti se nisu mogli učitati: {ex.Message}";
+            familyContacts = new();
+        }
+        finally
+        {
+            isLoadingContacts = false;
+        }
     }
 
     private async Task LoadResident()

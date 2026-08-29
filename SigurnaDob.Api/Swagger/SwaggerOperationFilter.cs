@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -8,38 +9,45 @@ public class SwaggerOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        KeepJsonContentOnly(operation);
-
-        var allowAnonymous = context.ApiDescription.ActionDescriptor.EndpointMetadata
+        if (context.ApiDescription.ActionDescriptor.EndpointMetadata
             .OfType<IAllowAnonymous>()
-            .Any();
-
-        if (allowAnonymous)
-            operation.Security = [];
-    }
-
-    private static void KeepJsonContentOnly(OpenApiOperation operation)
-    {
-        if (operation.RequestBody?.Content is { Count: > 0 } requestContent &&
-            requestContent.TryGetValue("application/json", out var requestJson))
+            .Any())
         {
-            requestContent.Clear();
-            requestContent["application/json"] = requestJson;
+            operation.Security = [];
         }
 
-        if (operation.Responses is null)
+        if (context.MethodInfo.Name != "Login")
             return;
 
-        foreach (var response in operation.Responses.Values)
+        if (operation.RequestBody?.Content?.TryGetValue("application/json", out var requestJson) == true)
         {
-            if (response.Content is not { Count: > 0 } responseContent)
-                continue;
+            requestJson.Example = JsonNode.Parse(
+                """
+                {
+                  "email": "admin@sigurna-dob.local",
+                  "password": "Admin123!"
+                }
+                """);
+        }
 
-            if (!responseContent.TryGetValue("application/json", out var responseJson))
-                continue;
-
-            responseContent.Clear();
-            responseContent["application/json"] = responseJson;
+        if (operation.Responses?.TryGetValue("200", out var okResponse) == true &&
+            okResponse.Content?.TryGetValue("application/json", out var responseJson) == true)
+        {
+            responseJson.Example = JsonNode.Parse(
+                """
+                {
+                  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example",
+                  "expiresAtUtc": "2026-08-29T12:00:00Z",
+                  "user": {
+                    "id": 1,
+                    "email": "admin@sigurna-dob.local",
+                    "displayName": "Admin korisnik",
+                    "roles": ["User", "Admin"],
+                    "employeeId": null,
+                    "familyContactId": null
+                  }
+                }
+                """);
         }
     }
 }

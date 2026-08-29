@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SigurnaDob.Api.Data;
 using SigurnaDob.Api.Security;
+using SigurnaDob.Shared.Constants;
 using SigurnaDob.Shared.Dtos;
 using SigurnaDob.Shared.Models;
 
@@ -13,6 +15,7 @@ namespace SigurnaDob.Api.Controllers;
 [Route("api/[controller]")]
 public class FamilyContactsController : ControllerBase
 {
+    private const string DefaultFamilyPassword = "Family123!";
     private readonly SigurnaDobDbContext _context;
 
     public FamilyContactsController(SigurnaDobDbContext context)
@@ -104,6 +107,13 @@ public class FamilyContactsController : ControllerBase
         _context.FamilyContacts.Add(contact);
         await _context.SaveChangesAsync();
 
+        if (dto.CreatePortalAccount)
+        {
+            var portalError = await TryCreatePortalAccountAsync(contact);
+            if (portalError is not null)
+                return BadRequest(portalError);
+        }
+
         return CreatedAtAction(
             nameof(GetFamilyContactById),
             new { id = contact.Id },
@@ -134,7 +144,74 @@ public class FamilyContactsController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        if (dto.CreatePortalAccount)
+        {
+            var portalError = await TryCreatePortalAccountAsync(contact);
+            if (portalError is not null)
+                return BadRequest(portalError);
+        }
+
         return Ok(await LoadDetailDto(id));
+    }
+
+    [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
+    [HttpPost("{id:int}/portal-account")]
+    public async Task<ActionResult<FamilyContactDetailDto>> CreatePortalAccount(int id)
+    {
+        var contact = await _context.FamilyContacts.FirstOrDefaultAsync(item => item.Id == id);
+        if (contact is null)
+            return NotFound();
+
+        var portalError = await TryCreatePortalAccountAsync(contact);
+        if (portalError is not null)
+            return BadRequest(portalError);
+
+        return Ok(await LoadDetailDto(id));
+    }
+
+    private async Task<string?> TryCreatePortalAccountAsync(FamilyContact contact)
+    {
+        if (string.IsNullOrWhiteSpace(contact.Email))
+            return "Email je obavezan za kreiranje portal računa.";
+
+        if (await _context.AppUsers.AnyAsync(user => user.FamilyContactId == contact.Id))
+            return "Kontakt već ima povezan portal račun.";
+
+        var email = contact.Email.Trim().ToLowerInvariant();
+        if (await _context.AppUsers.AnyAsync(user => user.Email == email))
+            return "Email je već registriran na drugom računu.";
+
+        var roleIds = await _context.AppRoles
+            .Where(role => role.Name == AppRoles.User || role.Name == AppRoles.FamilyMember)
+            .Select(role => role.Id)
+            .ToListAsync();
+
+        if (roleIds.Count != 2)
+            return "Uloge za portal obitelji nisu ispravno postavljene.";
+
+        var hasher = new PasswordHasher<AppUser>();
+        var user = new AppUser
+        {
+            Email = email,
+            DisplayName = $"{contact.FirstName} {contact.LastName}".Trim(),
+            FamilyContactId = contact.Id
+        };
+        user.PasswordHash = hasher.HashPassword(user, DefaultFamilyPassword);
+
+        _context.AppUsers.Add(user);
+        await _context.SaveChangesAsync();
+
+        foreach (var roleId in roleIds)
+        {
+            _context.AppUserRoles.Add(new AppUserRole
+            {
+                AppUserId = user.Id,
+                AppRoleId = roleId
+            });
+        }
+
+        await _context.SaveChangesAsync();
+        return null;
     }
 
     private async Task<string?> ValidateSaveRequest(SaveFamilyContactDto dto)

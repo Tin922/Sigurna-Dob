@@ -16,7 +16,6 @@ builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SupportNonNullableReferenceTypes();
     options.OperationFilter<SwaggerOperationFilter>();
 
     options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
@@ -111,7 +110,11 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.IndexStream = () => File.OpenRead(
+            Path.Combine(app.Environment.ContentRootPath, "Swagger", "index.html"));
+    });
 }
 
 app.UseHttpsRedirection();

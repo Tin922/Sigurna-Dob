@@ -9,4 +9,5 @@ public class SaveFamilyContactDto
     public string? Email { get; set; }
     public string? Note { get; set; }
     public int ResidentId { get; set; }
+    public bool CreatePortalAccount { get; set; }
 }
