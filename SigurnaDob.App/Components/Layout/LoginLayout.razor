@@ -1,0 +1,23 @@
+@inherits LayoutComponentBase
+@using SigurnaDob.App.Theme
+
+<MudThemeProvider Theme="SigurnaDobTheme.Theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="login-layout">
+    <div class="login-layout-brand">
+        <div class="login-brand-content">
+            <MudIcon Icon="@Icons.Material.Outlined.ElderlyWoman" Size="Size.Large" Class="login-brand-icon" />
+            <MudText Typo="Typo.h3" Class="login-brand-title">Sigurna dob</MudText>
+            <MudText Typo="Typo.body1" Class="login-brand-tagline">
+                Sustav za brigu, smještaj i svakodnevno vođenje doma za starije osobe.
+            </MudText>
+        </div>
+    </div>
+
+    <div class="login-layout-form">
+        @Body
+    </div>
+</div>

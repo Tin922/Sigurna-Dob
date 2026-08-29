@@ -1,0 +1,106 @@
+@page "/residents/{Id:int}"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Profil korisnika</PageTitle>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (resident is null)
+{
+    <MudAlert Severity="Severity.Error">Korisnik nije pronađen.</MudAlert>
+}
+else
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4" Class="page-title">@resident.FirstName @resident.LastName</MudText>
+        @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Href="@($"/residents/edit/{resident.Id}")">
+                Uredi
+            </MudButton>
+        }
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Osnovni podaci</MudText>
+                <MudText Typo="Typo.body2"><b>Status:</b> @resident.StatusName</MudText>
+                <MudText Typo="Typo.body2"><b>Soba:</b> @(resident.RoomName ?? "—")</MudText>
+                <MudText Typo="Typo.body2"><b>OIB:</b> @(resident.PersonalId ?? "—")</MudText>
+                <MudText Typo="Typo.body2"><b>Datum rođenja:</b> @(resident.DateOfBirth?.ToString("dd.MM.yyyy") ?? "—")</MudText>
+                <MudText Typo="Typo.body2"><b>Datum prijema:</b> @(resident.AdmittedAt?.ToString("dd.MM.yyyy") ?? "—")</MudText>
+                @if (resident.ArchivedAt.HasValue)
+                {
+                    <MudText Typo="Typo.body2"><b>Arhiviran:</b> @resident.ArchivedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.subtitle1" Class="mb-2">Bilješka</MudText>
+                <MudText Typo="Typo.body2">@(string.IsNullOrWhiteSpace(resident.Note) ? "—" : resident.Note)</MudText>
+                <MudText Typo="Typo.body2" Class="mt-3"><b>Obiteljski kontakti:</b> @resident.FamilyContactCount</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudButton Href="/residents" Variant="Variant.Text" Class="mt-4">← Natrag na popis</MudButton>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ResidentDetailDto? resident;
+    private bool isLoading = true;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        authReady = true;
+        await LoadResident();
+        StateHasChanged();
+    }
+
+    private async Task LoadResident()
+    {
+        isLoading = true;
+
+        try
+        {
+            resident = await Http.GetFromJsonAsync<ResidentDetailDto>($"api/residents/{Id}");
+        }
+        catch
+        {
+            resident = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

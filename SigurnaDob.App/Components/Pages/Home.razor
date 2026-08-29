@@ -1,51 +1,98 @@
 ﻿@page "/"
-@inject HttpClient Http
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
 
 <PageTitle>Sigurna dob</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Sigurna dob</MudText>
-<MudText Typo="Typo.body1" Class="mb-4">
-    Skeleton aplikacije za finalni projekt — upravljanje domom za starije osobe.
-</MudText>
+@if (!CurrentUser.IsInitialized)
+{
+    <div class="d-flex justify-center py-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else if (!CurrentUser.IsLoggedIn)
+{
+    <div class="welcome-hero">
+        <MudText Typo="Typo.h4" Class="welcome-hero-title">Sigurna dob</MudText>
+        <MudText Typo="Typo.body1" Class="welcome-hero-subtitle">
+            Sustav za upravljanje domom za starije osobe — korisnici, sobe, briga i posjete na jednom mjestu.
+        </MudText>
+        <MudButton Href="/login"
+                   Variant="Variant.Filled"
+                   Color="Color.Secondary"
+                   Class="mt-4"
+                   Size="Size.Large">
+            Prijava u sustav
+        </MudButton>
+    </div>
+}
+else
+{
+    <div class="welcome-hero">
+        <MudText Typo="Typo.h4" Class="welcome-hero-title">
+            Dobrodošli, @CurrentUser.User!.DisplayName
+        </MudText>
+        <MudText Typo="Typo.body1" Class="welcome-hero-subtitle">
+            Uloge: @string.Join(" · ", CurrentUser.User.Roles)
+        </MudText>
+    </div>
 
-@if (_loading)
-{
-    <MudProgressCircular Indeterminate="true" />
-}
-else if (_apiStatus is not null)
-{
-    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
-        API status: @_apiStatus
-    </MudAlert>
-}
-else if (_apiError is not null)
-{
-    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
-        API nije dostupan: @_apiError
-    </MudAlert>
+    @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-5 quick-link-card" Elevation="0">
+                    <div class="quick-link-icon residents">
+                        <MudIcon Icon="@Icons.Material.Outlined.Elderly" Size="Size.Medium" />
+                    </div>
+                    <MudText Typo="Typo.h6" Class="mb-1">Korisnici doma</MudText>
+                    <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
+                        Pregled, filteri i upravljanje korisnicima doma.
+                    </MudText>
+                    <MudButton Href="/residents" Variant="Variant.Filled" Color="Color.Primary">
+                        Otvori
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-5 quick-link-card" Elevation="0">
+                    <div class="quick-link-icon rooms">
+                        <MudIcon Icon="@Icons.Material.Outlined.MeetingRoom" Size="Size.Medium" />
+                    </div>
+                    <MudText Typo="Typo.h6" Class="mb-1">Sobe</MudText>
+                    <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
+                        Kapacitet, popunjenost i status soba u domu.
+                    </MudText>
+                    <MudButton Href="/rooms" Variant="Variant.Filled" Color="Color.Secondary">
+                        Otvori
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+    else
+    {
+        <MudPaper Class="pa-5 content-card" Elevation="0">
+            <MudText Typo="Typo.body1">
+                Prijavljeni ste kao član obitelji. Uskoro će biti dostupne stranice za posjete i obavijesti.
+            </MudText>
+        </MudPaper>
+    }
 }
 
 @code {
-    private bool _loading = true;
-    private string? _apiStatus;
-    private string? _apiError;
-
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        try
-        {
-            var response = await Http.GetFromJsonAsync<HealthResponse>("api/health");
-            _apiStatus = response?.Status;
-        }
-        catch (Exception ex)
-        {
-            _apiError = ex.Message;
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
+        if (!firstRender || CurrentUser.IsInitialized)
+            return;
 
-    private sealed record HealthResponse(string Status);
+        await CurrentUser.InitializeAsync();
+        StateHasChanged();
+    }
 }

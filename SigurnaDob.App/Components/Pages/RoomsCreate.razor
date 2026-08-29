@@ -1,0 +1,101 @@
+@page "/rooms/create"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Nova soba</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Nova soba</MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+<MudStack Spacing="2" Style="max-width: 460px">
+    <MudTextField @bind-Value="model.Name" Label="Naziv" Required="true" Variant="Variant.Outlined" />
+    <MudNumericField @bind-Value="model.Capacity" Label="Kapacitet" Min="1" Variant="Variant.Outlined" />
+
+    <MudSelect T="int"
+               Label="Status"
+               @bind-Value="model.RoomStatusId"
+               Variant="Variant.Outlined"
+               Required="true">
+        @foreach (var status in statuses)
+        {
+            <MudSelectItem Value="@status.Id">@status.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudTextField @bind-Value="model.Note" Label="Bilješka" Lines="2" Variant="Variant.Outlined" />
+
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+            @(isSaving ? "Spremanje..." : "Spremi")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Href="/rooms">Odustani</MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    private SaveRoomDto model = new() { Capacity = 1, RoomStatusId = RoomStatusIds.InUse };
+    private List<LookupDto> statuses = new();
+    private bool isSaving;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/rooms");
+            return;
+        }
+
+        authReady = true;
+        statuses = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/room-statuses") ?? new();
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/rooms", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo("/rooms");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

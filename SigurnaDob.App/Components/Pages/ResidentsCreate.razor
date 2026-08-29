@@ -1,0 +1,126 @@
+@page "/residents/create"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Novi korisnik</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Novi korisnik doma</MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+<MudStack Spacing="2" Style="max-width: 560px">
+    <MudTextField @bind-Value="model.FirstName" Label="Ime" Required="true" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="model.LastName" Label="Prezime" Required="true" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="model.PersonalId" Label="OIB" Variant="Variant.Outlined" />
+    <MudDatePicker @bind-Date="dateOfBirth" Label="Datum rođenja" Variant="Variant.Outlined" />
+    <MudDatePicker @bind-Date="admittedAt" Label="Datum prijema" Variant="Variant.Outlined" />
+
+    <MudSelect T="int"
+               Label="Status"
+               @bind-Value="model.ResidentStatusId"
+               Variant="Variant.Outlined"
+               Required="true">
+        @foreach (var status in statuses)
+        {
+            <MudSelectItem Value="@status.Id">@status.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="int?"
+               Label="Soba"
+               @bind-Value="model.RoomId"
+               Variant="Variant.Outlined"
+               Clearable="true">
+        @foreach (var room in rooms)
+        {
+            <MudSelectItem T="int?" Value="@((int?)room.Id)">@room.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudTextField @bind-Value="model.Note"
+                  Label="Bilješka"
+                  Lines="3"
+                  Variant="Variant.Outlined" />
+
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+            @(isSaving ? "Spremanje..." : "Spremi")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Href="/residents">Odustani</MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    private SaveResidentDto model = new() { ResidentStatusId = ResidentStatusIds.Preparing };
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> rooms = new();
+    private DateTime? dateOfBirth;
+    private DateTime? admittedAt;
+    private bool isSaving;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/residents");
+            return;
+        }
+
+        authReady = true;
+        statuses = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/resident-statuses") ?? new();
+        rooms = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/rooms") ?? new();
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            model.DateOfBirth = dateOfBirth.HasValue ? DateOnly.FromDateTime(dateOfBirth.Value) : null;
+            model.AdmittedAt = admittedAt.HasValue ? DateOnly.FromDateTime(admittedAt.Value) : null;
+
+            var response = await Http.PostAsJsonAsync("api/residents", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<ResidentDetailDto>();
+            Navigation.NavigateTo(created is null ? "/residents" : $"/residents/{created.Id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

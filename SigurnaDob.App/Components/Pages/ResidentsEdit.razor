@@ -1,0 +1,174 @@
+@page "/residents/edit/{Id:int}"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Uredi korisnika</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Uredi korisnika doma</MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudStack Spacing="2" Style="max-width: 560px">
+        <MudTextField @bind-Value="model.FirstName" Label="Ime" Required="true" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.LastName" Label="Prezime" Required="true" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="model.PersonalId" Label="OIB" Variant="Variant.Outlined" />
+        <MudDatePicker @bind-Date="dateOfBirth" Label="Datum rođenja" Variant="Variant.Outlined" />
+        <MudDatePicker @bind-Date="admittedAt" Label="Datum prijema" Variant="Variant.Outlined" />
+
+        <MudSelect T="int"
+                   Label="Status"
+                   @bind-Value="model.ResidentStatusId"
+                   Variant="Variant.Outlined"
+                   Required="true">
+            @foreach (var status in statuses)
+            {
+                <MudSelectItem Value="@status.Id">@status.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="int?"
+                   Label="Soba"
+                   @bind-Value="model.RoomId"
+                   Variant="Variant.Outlined"
+                   Clearable="true">
+            @foreach (var room in rooms)
+            {
+                <MudSelectItem T="int?" Value="@((int?)room.Id)">@room.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField @bind-Value="model.Note"
+                      Label="Bilješka"
+                      Lines="3"
+                      Variant="Variant.Outlined" />
+
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+                @(isSaving ? "Spremanje..." : "Spremi promjene")
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Href="@($"/residents/{Id}")">Odustani</MudButton>
+        </MudStack>
+    </MudStack>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private SaveResidentDto model = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> rooms = new();
+    private DateTime? dateOfBirth;
+    private DateTime? admittedAt;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/residents");
+            return;
+        }
+
+        authReady = true;
+        await LoadData();
+        StateHasChanged();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            statuses = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/resident-statuses") ?? new();
+            rooms = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/rooms") ?? new();
+
+            var resident = await Http.GetFromJsonAsync<ResidentDetailDto>($"api/residents/{Id}");
+            if (resident is null)
+            {
+                errorMessage = "Korisnik nije pronađen.";
+                return;
+            }
+
+            model = new SaveResidentDto
+            {
+                FirstName = resident.FirstName,
+                LastName = resident.LastName,
+                PersonalId = resident.PersonalId,
+                ResidentStatusId = resident.ResidentStatusId,
+                RoomId = resident.RoomId,
+                Note = resident.Note
+            };
+
+            dateOfBirth = resident.DateOfBirth?.ToDateTime(TimeOnly.MinValue);
+            admittedAt = resident.AdmittedAt?.ToDateTime(TimeOnly.MinValue);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            model.DateOfBirth = dateOfBirth.HasValue ? DateOnly.FromDateTime(dateOfBirth.Value) : null;
+            model.AdmittedAt = admittedAt.HasValue ? DateOnly.FromDateTime(admittedAt.Value) : null;
+
+            var response = await Http.PutAsJsonAsync($"api/residents/{Id}", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo($"/residents/{Id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

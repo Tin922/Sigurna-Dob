@@ -1,0 +1,199 @@
+@page "/residents"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.WebUtilities
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Korisnici doma</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Korisnici doma</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">Pregled i upravljanje korisnicima doma</MudText>
+</div>
+
+@if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+{
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               Href="/residents/create"
+               Class="mb-4"
+               StartIcon="@Icons.Material.Filled.Add">
+        Novi korisnik
+    </MudButton>
+}
+
+<MudPaper Class="pa-4 filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="search"
+                          Label="Pretraži"
+                          Placeholder="Ime ili prezime"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       Label="Status"
+                       @bind-Value="statusId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var status in statuses)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)status.Id)">@status.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       Label="Soba"
+                       @bind-Value="roomId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var room in rooms)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)room.Id)">@room.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadResidents">
+                Primijeni
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetFilters">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="residents" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+        <HeaderContent>
+            <MudTh>Ime</MudTh>
+            <MudTh>Prezime</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Soba</MudTh>
+            <MudTh>Prijem</MudTh>
+            <MudTh>Akcije</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.FirstName</MudTd>
+            <MudTd>@context.LastName</MudTd>
+            <MudTd>@context.StatusName</MudTd>
+            <MudTd>@(context.RoomName ?? "-")</MudTd>
+            <MudTd>@(context.AdmittedAt?.ToString("dd.MM.yyyy") ?? "-")</MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Primary"
+                           Href="@($"/residents/{context.Id}")">
+                    Profil
+                </MudButton>
+                @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+                {
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Secondary"
+                               Href="@($"/residents/edit/{context.Id}")">
+                        Uredi
+                    </MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema rezultata za zadane filtere.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<ResidentDto> residents = new();
+    private List<LookupDto> statuses = new();
+    private List<LookupDto> rooms = new();
+    private string? search;
+    private int? statusId;
+    private int? roomId;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        authReady = true;
+        await LoadLookups();
+        await LoadResidents();
+        StateHasChanged();
+    }
+
+    private async Task LoadLookups()
+    {
+        statuses = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/resident-statuses") ?? new();
+        rooms = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/rooms") ?? new();
+    }
+
+    private async Task LoadResidents()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var query = new Dictionary<string, string?>();
+            if (!string.IsNullOrWhiteSpace(search))
+                query["search"] = search.Trim();
+            if (statusId.HasValue)
+                query["statusId"] = statusId.Value.ToString();
+            if (roomId.HasValue)
+                query["roomId"] = roomId.Value.ToString();
+            query["sortBy"] = "lastName";
+            query["sortDir"] = "asc";
+
+            var url = QueryHelpers.AddQueryString("api/residents", query);
+            residents = await Http.GetFromJsonAsync<List<ResidentDto>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Korisnike nije moguće učitati: {ex.Message}";
+            residents = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        search = null;
+        statusId = null;
+        roomId = null;
+        await LoadResidents();
+    }
+}

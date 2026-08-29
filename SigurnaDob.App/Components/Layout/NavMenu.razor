@@ -1,5 +1,96 @@
-﻿<MudNavMenu>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">
-        Početna
-    </MudNavLink>
-</MudNavMenu>
+﻿@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="nav-menu-root">
+    @if (!CurrentUser.IsInitialized)
+    {
+        <div class="d-flex justify-center pa-4">
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        </div>
+    }
+    else if (!CurrentUser.IsLoggedIn)
+    {
+        <MudNavMenu Class="mud-width-full">
+            <MudNavLink Href="/login" Icon="@Icons.Material.Filled.Login">
+                Prijava
+            </MudNavLink>
+        </MudNavMenu>
+    }
+    else
+    {
+        <div class="nav-menu-header">
+            <MudText Typo="Typo.subtitle1" Class="px-3 pt-3">
+                @CurrentUser.User!.DisplayName
+            </MudText>
+            <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1" Class="px-3 pb-3 pt-1">
+                @foreach (var role in CurrentUser.User!.Roles)
+                {
+                    <MudChip T="string" Size="Size.Small">@role</MudChip>
+                }
+            </MudStack>
+        </div>
+
+        <div class="nav-menu-links">
+            <MudNavMenu Class="mud-width-full">
+                <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home" Match="NavLinkMatch.All">
+                    Početna
+                </MudNavLink>
+
+                @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+                {
+                    <MudNavLink Href="/residents" Icon="@Icons.Material.Filled.Elderly">
+                        Korisnici doma
+                    </MudNavLink>
+
+                    <MudNavLink Href="/rooms" Icon="@Icons.Material.Filled.MeetingRoom">
+                        Sobe
+                    </MudNavLink>
+                }
+            </MudNavMenu>
+        </div>
+
+        <div class="nav-menu-footer">
+            <MudDivider />
+            <MudNavMenu Class="mud-width-full">
+                <MudNavLink Icon="@Icons.Material.Filled.Logout"
+                            OnClick="HandleLogout">
+                    Odjava
+                </MudNavLink>
+            </MudNavMenu>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        CurrentUser.UserChanged += HandleUserChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || CurrentUser.IsInitialized)
+            return;
+
+        await CurrentUser.InitializeAsync();
+    }
+
+    private void HandleUserChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleLogout()
+    {
+        await CurrentUser.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        CurrentUser.UserChanged -= HandleUserChanged;
+    }
+}

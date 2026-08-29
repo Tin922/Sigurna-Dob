@@ -1,5 +1,7 @@
 using SigurnaDob.App.Components;
 using MudBlazor.Services;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using SigurnaDob.App.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +12,8 @@ builder.Services.AddRazorComponents()
     });
 
 builder.Services.AddMudServices();
+builder.Services.AddScoped<ProtectedLocalStorage>();
+builder.Services.AddScoped<CurrentUserService>();
 
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7210/";
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });

@@ -1,0 +1,106 @@
+@page "/login"
+@layout LoginLayout
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Prijava</PageTitle>
+
+<div class="login-form-panel">
+    <MudText Typo="Typo.h4" Class="page-title mb-1">Prijava</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle mb-5">
+        Unesi podatke demo korisnika i provjeri kako se aplikacija mijenja prema ulozi.
+    </MudText>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Outlined">@errorMessage</MudAlert>
+    }
+
+    <EditForm Model="model" OnValidSubmit="HandleLogin" FormName="login-form">
+        <MudPaper Class="pa-5 content-card" Elevation="0">
+            <MudTextField Label="Email"
+                          @bind-Value="model.Email"
+                          Required="true"
+                          Variant="Variant.Outlined"
+                          Class="mb-3" />
+
+            <MudTextField Label="Lozinka"
+                          @bind-Value="model.Password"
+                          InputType="InputType.Password"
+                          Required="true"
+                          Variant="Variant.Outlined"
+                          Class="mb-4" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="isSaving">
+                @(isSaving ? "Provjera..." : "Prijavi se")
+            </MudButton>
+        </MudPaper>
+    </EditForm>
+
+    <MudPaper Class="pa-4 mt-4 demo-accounts-panel" Elevation="0">
+        <MudText Typo="Typo.subtitle2" Class="mb-2" Style="color: #5C6B6B">Demo računi</MudText>
+        <MudText Typo="Typo.body2">admin@sigurna-dob.local / Admin123!</MudText>
+        <MudText Typo="Typo.body2">coordinator@sigurna-dob.local / Coordinator123!</MudText>
+        <MudText Typo="Typo.body2">caregiver@sigurna-dob.local / Caregiver123!</MudText>
+        <MudText Typo="Typo.body2">family@sigurna-dob.local / Family123!</MudText>
+    </MudPaper>
+</div>
+
+@code {
+    private LoginRequestDto model = new();
+    private string? errorMessage;
+    private bool isSaving;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || CurrentUser.IsInitialized)
+            return;
+
+        await CurrentUser.InitializeAsync();
+
+        if (CurrentUser.IsLoggedIn)
+            Navigation.NavigateTo("/");
+    }
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+        isSaving = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/login", model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = "Pogrešan email ili lozinka.";
+                return;
+            }
+
+            var login = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
+            if (login is null)
+            {
+                errorMessage = "API nije vratio podatke o korisniku.";
+                return;
+            }
+
+            await CurrentUser.LoginAsync(login);
+            Navigation.NavigateTo("/");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

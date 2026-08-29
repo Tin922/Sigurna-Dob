@@ -1,25 +1,32 @@
 ﻿@inherits LayoutComponentBase
+@using SigurnaDob.App.Theme
 
-<MudThemeProvider />
+<MudThemeProvider Theme="SigurnaDobTheme.Theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Primary">
-        <MudText Typo="Typo.h6">Sigurna dob</MudText>
+<MudLayout Class="sigurna-layout">
+    <MudAppBar Elevation="0" Class="sigurna-appbar" Dense="true">
+        <MudIcon Icon="@Icons.Material.Outlined.ElderlyWoman" Class="sigurna-appbar-logo mr-2" />
+        <MudText Typo="Typo.h6" Class="sigurna-appbar-title">Sigurna dob</MudText>
         <MudSpacer />
-        <MudText Typo="Typo.body2">Dom za starije osobe</MudText>
+        <MudText Typo="Typo.caption" Class="sigurna-appbar-subtitle d-none d-sm-block">
+            Dom za starije osobe
+        </MudText>
     </MudAppBar>
 
     <MudDrawer Open="true"
-               Elevation="1"
+               Elevation="0"
                Variant="DrawerVariant.Responsive"
-               ClipMode="DrawerClipMode.Always">
+               ClipMode="DrawerClipMode.Always"
+               Class="sigurna-drawer">
         <NavMenu />
     </MudDrawer>
 
-    <MudMainContent Class="pa-6 mt-16">
-        @Body
+    <MudMainContent Class="sigurna-main">
+        <div class="sigurna-content">
+            @Body
+        </div>
     </MudMainContent>
 </MudLayout>
