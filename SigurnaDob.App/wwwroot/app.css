@@ -142,3 +142,68 @@ h1:focus {
 .upload-panel ::deep .mud-chip-set {
     display: none !important;
 }
+
+.dashboard-stat-card {
+    border: 1px solid #E5DDD3;
+    border-radius: 14px;
+    background: #FFFFFF;
+    height: 100%;
+}
+
+.dashboard-stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+}
+
+.dashboard-stat-icon.residents {
+    background: rgba(45, 106, 106, 0.12);
+    color: #2D6A6A;
+}
+
+.dashboard-stat-icon.rooms {
+    background: rgba(212, 165, 116, 0.18);
+    color: #A67548;
+}
+
+.dashboard-stat-icon.tasks {
+    background: rgba(30, 69, 69, 0.1);
+    color: #1E4545;
+}
+
+.dashboard-stat-icon.overdue {
+    background: rgba(198, 40, 40, 0.1);
+    color: #C62828;
+}
+
+.dashboard-stat-icon.visits {
+    background: rgba(76, 175, 80, 0.12);
+    color: #388E3C;
+}
+
+.dashboard-stat-value {
+    font-weight: 700 !important;
+    color: #1E4545;
+    line-height: 1.2;
+}
+
+.dashboard-stat-label {
+    color: #5C6B6B;
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.dashboard-event-title {
+    font-weight: 600;
+    color: #1E4545;
+}
+
+.dashboard-event-time {
+    color: #8A9696;
+    margin-top: 0.25rem;
+    display: block;
+}

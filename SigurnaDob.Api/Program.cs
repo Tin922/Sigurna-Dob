@@ -49,6 +49,7 @@ builder.Services.AddScoped<JwtTokenService>();
 builder.Services.Configure<FileUploadOptions>(
     builder.Configuration.GetSection(FileUploadOptions.SectionName));
 builder.Services.AddScoped<ResidentMediaStorageService>();
+builder.Services.AddScoped<DashboardService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -3,8 +3,10 @@
 
 @using SigurnaDob.App.Services
 @using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
 
 @inject CurrentUserService CurrentUser
+@inject HttpClient Http
 @inject NavigationManager Navigation
 
 <PageTitle>Sigurna dob</PageTitle>
@@ -38,61 +40,224 @@ else
             Dobrodošli, @CurrentUser.User!.DisplayName
         </MudText>
         <MudText Typo="Typo.body1" Class="welcome-hero-subtitle">
-            Uloge: @string.Join(" · ", CurrentUser.User.Roles)
+            Uloge: @string.Join(" · ", CurrentUser.User?.Roles ?? new List<string>())
         </MudText>
     </div>
 
-    @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
-        <MudGrid Spacing="3">
-            <MudItem xs="12" md="6">
-                <MudPaper Class="pa-5 quick-link-card" Elevation="0">
-                    <div class="quick-link-icon residents">
-                        <MudIcon Icon="@Icons.Material.Outlined.Elderly" Size="Size.Medium" />
-                    </div>
-                    <MudText Typo="Typo.h6" Class="mb-1">Korisnici doma</MudText>
-                    <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
-                        Pregled, filteri i upravljanje korisnicima doma.
-                    </MudText>
-                    <MudButton Href="/residents" Variant="Variant.Filled" Color="Color.Primary">
-                        Otvori
-                    </MudButton>
-                </MudPaper>
-            </MudItem>
-
-            <MudItem xs="12" md="6">
-                <MudPaper Class="pa-5 quick-link-card" Elevation="0">
-                    <div class="quick-link-icon rooms">
-                        <MudIcon Icon="@Icons.Material.Outlined.MeetingRoom" Size="Size.Medium" />
-                    </div>
-                    <MudText Typo="Typo.h6" Class="mb-1">Sobe</MudText>
-                    <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
-                        Kapacitet, popunjenost i status soba u domu.
-                    </MudText>
-                    <MudButton Href="/rooms" Variant="Variant.Filled" Color="Color.Secondary">
-                        Otvori
-                    </MudButton>
-                </MudPaper>
-            </MudItem>
-        </MudGrid>
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
     }
-    else
+
+    @if (isLoading)
     {
-        <MudPaper Class="pa-5 content-card" Elevation="0">
-            <MudText Typo="Typo.body1">
-                Prijavljeni ste kao član obitelji. Uskoro će biti dostupne stranice za posjete i obavijesti.
-            </MudText>
+        <div class="d-flex justify-center py-6">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (dashboard is not null)
+    {
+        @if (dashboard.Operational is not null)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3 page-title">Operativni pregled</MudText>
+            <MudGrid Spacing="3" Class="mb-5">
+                <MudItem xs="6" sm="4" md="2">
+                    <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                        <div class="dashboard-stat-icon residents">
+                            <MudIcon Icon="@Icons.Material.Outlined.Elderly" Size="Size.Small" />
+                        </div>
+                        <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Operational.ActiveResidents</MudText>
+                        <MudText Typo="Typo.caption" Class="dashboard-stat-label">Aktivni korisnici</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="4" md="2">
+                    <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                        <div class="dashboard-stat-icon rooms">
+                            <MudIcon Icon="@Icons.Material.Outlined.MeetingRoom" Size="Size.Small" />
+                        </div>
+                        <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Operational.AvailableSpots</MudText>
+                        <MudText Typo="Typo.caption" Class="dashboard-stat-label">Slobodna mjesta</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="4" md="2">
+                    <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                        <div class="dashboard-stat-icon tasks">
+                            <MudIcon Icon="@Icons.Material.Outlined.Assignment" Size="Size.Small" />
+                        </div>
+                        <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Operational.OpenCareTasks</MudText>
+                        <MudText Typo="Typo.caption" Class="dashboard-stat-label">Otvoreni zadaci</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="4" md="2">
+                    <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                        <div class="dashboard-stat-icon overdue">
+                            <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Small" />
+                        </div>
+                        <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Operational.OverdueCareTasks</MudText>
+                        <MudText Typo="Typo.caption" Class="dashboard-stat-label">Zakašnjeli zadaci</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="4" md="2">
+                    <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                        <div class="dashboard-stat-icon visits">
+                            <MudIcon Icon="@Icons.Material.Outlined.Event" Size="Size.Small" />
+                        </div>
+                        <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Operational.PendingVisitRequests</MudText>
+                        <MudText Typo="Typo.caption" Class="dashboard-stat-label">Posjeti na odluku</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+
+        @if (dashboard.Personal is not null &&
+             (dashboard.Personal.MyOpenCareTasks.HasValue || dashboard.Personal.MyVisitRequests.HasValue))
+        {
+            <MudText Typo="Typo.h6" Class="mb-3 page-title">Moj pregled</MudText>
+            <MudGrid Spacing="3" Class="mb-5">
+                @if (dashboard.Personal.MyOpenCareTasks.HasValue)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                            <div class="dashboard-stat-icon tasks">
+                                <MudIcon Icon="@Icons.Material.Outlined.AssignmentInd" Size="Size.Small" />
+                            </div>
+                            <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Personal.MyOpenCareTasks</MudText>
+                            <MudText Typo="Typo.caption" Class="dashboard-stat-label">Moji otvoreni zadaci</MudText>
+                            <MudButton Href="/my-care-tasks"
+                                       Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Class="mt-2 px-0">
+                                Otvori zadatke
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+                }
+                @if (dashboard.Personal.MyVisitRequests.HasValue)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                            <div class="dashboard-stat-icon visits">
+                                <MudIcon Icon="@Icons.Material.Outlined.FamilyRestroom" Size="Size.Small" />
+                            </div>
+                            <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Personal.MyVisitRequests</MudText>
+                            <MudText Typo="Typo.caption" Class="dashboard-stat-label">Moji zahtjevi za posjet</MudText>
+                            <MudButton Href="/my-visit-requests"
+                                       Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Class="mt-2 px-0">
+                                Otvori zahtjeve
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+
+        <MudText Typo="Typo.h6" Class="mb-3 page-title">Nedavne promjene</MudText>
+        <MudPaper Class="content-card mb-5" Elevation="0">
+            @if (dashboard.RecentEvents.Count == 0)
+            {
+                <MudText Class="pa-4 page-subtitle">Nema nedavnih događaja za prikaz.</MudText>
+            }
+            else
+            {
+                <MudList T="DashboardEventDto" Dense="true">
+                    @foreach (var item in dashboard.RecentEvents)
+                    {
+                        <MudListItem>
+                            <div class="dashboard-event">
+                                <MudText Typo="Typo.body2" Class="dashboard-event-title">@item.Title</MudText>
+                                <MudText Typo="Typo.caption" Class="page-subtitle">@item.Description</MudText>
+                                <MudText Typo="Typo.caption" Class="dashboard-event-time">
+                                    @item.OccurredAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                </MudText>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            }
         </MudPaper>
+
+        @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+        {
+            <MudText Typo="Typo.h6" Class="mb-3 page-title">Brzi pristup</MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-5 quick-link-card" Elevation="0">
+                        <div class="quick-link-icon residents">
+                            <MudIcon Icon="@Icons.Material.Outlined.Elderly" Size="Size.Medium" />
+                        </div>
+                        <MudText Typo="Typo.h6" Class="mb-1">Korisnici doma</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
+                            Pregled, filteri i upravljanje korisnicima doma.
+                        </MudText>
+                        <MudButton Href="/residents" Variant="Variant.Filled" Color="Color.Primary">
+                            Otvori
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-5 quick-link-card" Elevation="0">
+                        <div class="quick-link-icon rooms">
+                            <MudIcon Icon="@Icons.Material.Outlined.MeetingRoom" Size="Size.Medium" />
+                        </div>
+                        <MudText Typo="Typo.h6" Class="mb-1">Sobe</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
+                            Kapacitet, popunjenost i status soba u domu.
+                        </MudText>
+                        <MudButton Href="/rooms" Variant="Variant.Filled" Color="Color.Secondary">
+                            Otvori
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
     }
 }
 
 @code {
+    private DashboardDto? dashboard;
+    private bool isLoading;
+    private string? errorMessage;
+    private bool authReady;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || CurrentUser.IsInitialized)
+        if (!firstRender)
             return;
 
-        await CurrentUser.InitializeAsync();
+        if (!CurrentUser.IsInitialized)
+            await CurrentUser.InitializeAsync();
+
+        if (!authReady && CurrentUser.IsLoggedIn)
+        {
+            authReady = true;
+            await LoadDashboardAsync();
+        }
+
         StateHasChanged();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            dashboard = await Http.GetFromJsonAsync<DashboardDto>("api/dashboard");
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nije moguće učitati nadzornu ploču. Pokušajte ponovno.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 }
