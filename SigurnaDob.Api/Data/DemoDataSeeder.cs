@@ -210,6 +210,67 @@ public static class DemoDataSeeder
                 });
         }
 
+        if (!await db.Activities.AnyAsync())
+        {
+            var residentId = await db.Residents.Select(resident => resident.Id).FirstAsync();
+            var coordinatorId = await db.Employees
+                .Where(employee => employee.EmployeeCode == "EMP-001")
+                .Select(employee => employee.Id)
+                .FirstAsync();
+
+            var now = DateTime.UtcNow;
+
+            var socialActivity = new Activity
+            {
+                Title = "Popodnevno druženje",
+                Description = "Kava, razgovor i društvene igre u dnevnoj sobi.",
+                ActivityTypeId = 1,
+                CoordinatorId = coordinatorId,
+                StartsAt = now.AddDays(2).Date.AddHours(15),
+                EndsAt = now.AddDays(2).Date.AddHours(16).AddMinutes(30),
+                Location = "Dnevna soba",
+                UpdatedAt = now
+            };
+            socialActivity.ResidentActivities.Add(new ResidentActivity
+            {
+                ResidentId = residentId,
+                EnrolledAt = now
+            });
+
+            var creativeActivity = new Activity
+            {
+                Title = "Kreativna radionica",
+                Description = "Slikanje akvarelima i jednostavni ručni radovi.",
+                ActivityTypeId = 2,
+                CoordinatorId = coordinatorId,
+                StartsAt = now.AddDays(5).Date.AddHours(10),
+                EndsAt = now.AddDays(5).Date.AddHours(11).AddMinutes(30),
+                Location = "Radionica",
+                UpdatedAt = now
+            };
+            creativeActivity.ResidentActivities.Add(new ResidentActivity
+            {
+                ResidentId = residentId,
+                EnrolledAt = now,
+                Note = "Potrebni materijali su na raspolaganju."
+            });
+
+            db.Activities.AddRange(
+                socialActivity,
+                creativeActivity,
+                new Activity
+                {
+                    Title = "Jutarnja gimnastika",
+                    Description = "Lagana tjelovježba prilagođena starijim osobama.",
+                    ActivityTypeId = 3,
+                    CoordinatorId = coordinatorId,
+                    StartsAt = now.AddDays(1).Date.AddHours(9),
+                    EndsAt = now.AddDays(1).Date.AddHours(9).AddMinutes(45),
+                    Location = "Dvorana",
+                    UpdatedAt = now
+                });
+        }
+
         await db.SaveChangesAsync();
     }
 }

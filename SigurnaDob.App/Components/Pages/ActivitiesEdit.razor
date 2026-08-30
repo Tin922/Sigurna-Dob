@@ -1,0 +1,401 @@
+@page "/activities/edit/{Id:int}"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Uredi aktivnost</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Uredi aktivnost</MudText>
+    @if (!string.IsNullOrWhiteSpace(typeName))
+    {
+        <MudText Typo="Typo.body2" Class="page-subtitle">@typeName</MudText>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@successMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4 content-card" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-3">Osnovni podaci</MudText>
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="model.Title" Label="Naslov" Required="true" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="model.Description" Label="Opis" Lines="3" Variant="Variant.Outlined" />
+
+                    <MudSelect T="int"
+                               Label="Vrsta aktivnosti"
+                               @bind-Value="model.ActivityTypeId"
+                               Variant="Variant.Outlined"
+                               Required="true">
+                        @foreach (var type in types)
+                        {
+                            <MudSelectItem Value="@type.Id">@type.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="model.Location" Label="Lokacija" Variant="Variant.Outlined" />
+
+                    <MudDatePicker @bind-Date="startDate" Label="Početak (datum)" Variant="Variant.Outlined" />
+                    <MudTimePicker @bind-Time="startTime" Label="Početak (vrijeme)" Variant="Variant.Outlined" />
+
+                    <MudDatePicker @bind-Date="endDate" Label="Završetak (datum)" Variant="Variant.Outlined" Clearable="true" />
+                    <MudTimePicker @bind-Time="endTime" Label="Završetak (vrijeme)" Variant="Variant.Outlined" Clearable="true" />
+
+                    <MudStack Row="true" Spacing="2" Class="pt-2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+                            @(isSaving ? "Spremanje..." : "Spremi promjene")
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Href="/activities">Natrag</MudButton>
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Error"
+                                   OnClick="DeleteActivity"
+                                   Disabled="isSaving">
+                            Obriši
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4 content-card" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-3">Sudionici (@participants.Count)</MudText>
+
+                <MudStack Row="true" Spacing="2" Class="mb-4">
+                    <MudSelect T="int?"
+                               Label="Dodaj korisnika"
+                               @bind-Value="selectedResidentId"
+                               Variant="Variant.Outlined"
+                               Style="min-width: 220px"
+                               Clearable="true">
+                        @foreach (var resident in availableResidents)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)resident.Id)">@resident.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Secondary"
+                               OnClick="EnrollParticipant"
+                               Disabled="@(!selectedResidentId.HasValue || isEnrolling)">
+                        Dodaj
+                    </MudButton>
+                </MudStack>
+
+                <MudTable Items="participants" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Korisnik</MudTh>
+                        <MudTh>Evidentirano</MudTh>
+                        <MudTh>Akcije</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            @context.ResidentName
+                            @if (!string.IsNullOrWhiteSpace(context.Note))
+                            {
+                                <MudText Typo="Typo.caption" Class="page-subtitle">@context.Note</MudText>
+                            }
+                        </MudTd>
+                        <MudTd>@context.EnrolledAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                        <MudTd>
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => RemoveParticipant(context.ResidentId))"
+                                       Disabled="@(busyResidentId == context.ResidentId)">
+                                Ukloni
+                            </MudButton>
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Class="pa-2">Još nema evidentiranih sudionika.</MudText>
+                    </NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private SaveActivityDto model = new();
+    private List<ActivityParticipantDto> participants = new();
+    private List<LookupDto> types = new();
+    private List<LookupDto> residents = new();
+    private DateTime? startDate;
+    private TimeSpan? startTime;
+    private DateTime? endDate;
+    private TimeSpan? endTime;
+    private int? selectedResidentId;
+    private int? busyResidentId;
+    private string? typeName;
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isEnrolling;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool authReady;
+
+    private IEnumerable<LookupDto> availableResidents =>
+        residents.Where(resident => participants.All(participant => participant.ResidentId != resident.Id));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/activities");
+            return;
+        }
+
+        authReady = true;
+        types = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/activity-types") ?? new();
+        residents = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/residents") ?? new();
+        await LoadActivity();
+        StateHasChanged();
+    }
+
+    private async Task LoadActivity()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var detail = await Http.GetFromJsonAsync<ActivityDetailDto>($"api/activities/{Id}");
+            if (detail is null)
+            {
+                errorMessage = "Aktivnost nije pronađena.";
+                return;
+            }
+
+            typeName = detail.TypeName;
+            model = new SaveActivityDto
+            {
+                Title = detail.Title,
+                Description = detail.Description,
+                ActivityTypeId = detail.ActivityTypeId,
+                Location = detail.Location,
+                StartsAt = detail.StartsAt,
+                EndsAt = detail.EndsAt
+            };
+
+            ApplyDateFields(detail.StartsAt, detail.EndsAt);
+            participants = detail.Participants;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Aktivnost nije moguće učitati: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyDateFields(DateTime startsAtUtc, DateTime? endsAtUtc)
+    {
+        var startLocal = startsAtUtc.ToLocalTime();
+        startDate = startLocal.Date;
+        startTime = startLocal.TimeOfDay;
+
+        if (endsAtUtc.HasValue)
+        {
+            var endLocal = endsAtUtc.Value.ToLocalTime();
+            endDate = endLocal.Date;
+            endTime = endLocal.TimeOfDay;
+        }
+        else
+        {
+            endDate = null;
+            endTime = null;
+        }
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (startDate is null || startTime is null)
+        {
+            errorMessage = "Odaberite datum i vrijeme početka.";
+            return;
+        }
+
+        model.StartsAt = ToUtc(startDate.Value, startTime.Value);
+        model.EndsAt = endDate.HasValue && endTime.HasValue
+            ? ToUtc(endDate.Value, endTime.Value)
+            : null;
+
+        isSaving = true;
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"api/activities/{Id}", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Promjene su spremljene.";
+            await LoadActivity();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task EnrollParticipant()
+    {
+        if (!selectedResidentId.HasValue)
+            return;
+
+        isEnrolling = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"api/activities/{Id}/participants",
+                new EnrollActivityParticipantDto { ResidentId = selectedResidentId.Value });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            selectedResidentId = null;
+            successMessage = "Sudionik je dodan.";
+            await LoadActivity();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isEnrolling = false;
+        }
+    }
+
+    private async Task<bool> ConfirmAsync(string title, string message, string confirmText)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, message },
+            { x => x.ConfirmText, confirmText }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>(title, parameters);
+        var result = await dialog.Result;
+        return result is not null && !result.Canceled;
+    }
+
+    private async Task RemoveParticipant(int residentId)
+    {
+        if (!await ConfirmAsync(
+                "Ukloni sudionika",
+                "Jeste li sigurni da želite ukloniti sudionika s aktivnosti?",
+                "Ukloni"))
+            return;
+
+        busyResidentId = residentId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/activities/{Id}/participants/{residentId}");
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Sudionik je uklonjen.";
+            await LoadActivity();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busyResidentId = null;
+        }
+    }
+
+    private async Task DeleteActivity()
+    {
+        if (!await ConfirmAsync(
+                "Obriši aktivnost",
+                "Jeste li sigurni da želite obrisati ovu aktivnost? Svi sudionici bit će uklonjeni.",
+                "Obriši"))
+            return;
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/activities/{Id}");
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Navigation.NavigateTo("/activities");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static DateTime ToUtc(DateTime date, TimeSpan time)
+    {
+        var local = DateTime.SpecifyKind(date.Date + time, DateTimeKind.Local);
+        return local.ToUniversalTime();
+    }
+}

@@ -1,0 +1,130 @@
+@page "/activities/create"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Nova aktivnost</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Nova aktivnost</MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+<MudStack Spacing="2" Style="max-width: 560px">
+    <MudTextField @bind-Value="model.Title" Label="Naslov" Required="true" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="model.Description" Label="Opis" Lines="3" Variant="Variant.Outlined" />
+
+    <MudSelect T="int"
+               Label="Vrsta aktivnosti"
+               @bind-Value="model.ActivityTypeId"
+               Variant="Variant.Outlined"
+               Required="true">
+        @foreach (var type in types)
+        {
+            <MudSelectItem Value="@type.Id">@type.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudTextField @bind-Value="model.Location" Label="Lokacija" Variant="Variant.Outlined" />
+
+    <MudDatePicker @bind-Date="startDate" Label="Početak (datum)" Variant="Variant.Outlined" Required="true" />
+    <MudTimePicker @bind-Time="startTime" Label="Početak (vrijeme)" Variant="Variant.Outlined" Required="true" />
+
+    <MudDatePicker @bind-Date="endDate" Label="Završetak (datum)" Variant="Variant.Outlined" Clearable="true" />
+    <MudTimePicker @bind-Time="endTime" Label="Završetak (vrijeme)" Variant="Variant.Outlined" Clearable="true" />
+
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+            @(isSaving ? "Spremanje..." : "Spremi")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Href="/activities">Odustani</MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    private SaveActivityDto model = new() { ActivityTypeId = 1 };
+    private List<LookupDto> types = new();
+    private DateTime? startDate = DateTime.Today.AddDays(1);
+    private TimeSpan? startTime = new TimeSpan(10, 0, 0);
+    private DateTime? endDate;
+    private TimeSpan? endTime;
+    private bool isSaving;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/activities");
+            return;
+        }
+
+        authReady = true;
+        types = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/activity-types") ?? new();
+        StateHasChanged();
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+
+        if (startDate is null || startTime is null)
+        {
+            errorMessage = "Odaberite datum i vrijeme početka.";
+            return;
+        }
+
+        model.StartsAt = ToUtc(startDate.Value, startTime.Value);
+        model.EndsAt = endDate.HasValue && endTime.HasValue
+            ? ToUtc(endDate.Value, endTime.Value)
+            : null;
+
+        isSaving = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/activities", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<ActivityDetailDto>();
+            Navigation.NavigateTo(created is null ? "/activities" : $"/activities/edit/{created.Id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static DateTime ToUtc(DateTime date, TimeSpan time)
+    {
+        var local = DateTime.SpecifyKind(date.Date + time, DateTimeKind.Local);
+        return local.ToUniversalTime();
+    }
+}

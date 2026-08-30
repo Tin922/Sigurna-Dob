@@ -1,0 +1,169 @@
+@page "/activities"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.WebUtilities
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Aktivnosti</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Aktivnosti</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">Organizacija zajedničkih aktivnosti i sudionika</MudText>
+</div>
+
+<MudButton Variant="Variant.Filled"
+           Color="Color.Primary"
+           Href="/activities/create"
+           Class="mb-4"
+           StartIcon="@Icons.Material.Filled.Add">
+    Nova aktivnost
+</MudButton>
+
+<MudPaper Class="pa-4 filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="search"
+                          Label="Pretraži"
+                          Placeholder="Naslov, opis ili lokacija"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       Label="Vrsta"
+                       @bind-Value="typeId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var type in types)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)type.Id)">@type.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadActivities">
+                Primijeni
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetFilters">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="activities" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+        <HeaderContent>
+            <MudTh>Aktivnost</MudTh>
+            <MudTh>Vrsta</MudTh>
+            <MudTh>Početak</MudTh>
+            <MudTh>Lokacija</MudTh>
+            <MudTh>Sudionici</MudTh>
+            <MudTh>Akcije</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @context.Title
+                @if (!string.IsNullOrWhiteSpace(context.Description))
+                {
+                    <MudText Typo="Typo.caption" Class="page-subtitle">@context.Description</MudText>
+                }
+            </MudTd>
+            <MudTd>@context.TypeName</MudTd>
+            <MudTd>@context.StartsAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+            <MudTd>@(context.Location ?? "—")</MudTd>
+            <MudTd>@context.ParticipantCount</MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Primary"
+                           Href="@($"/activities/edit/{context.Id}")">
+                    Uredi
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema aktivnosti za zadane filtere.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<ActivityDto> activities = new();
+    private List<LookupDto> types = new();
+    private string? search;
+    private int? typeId;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        authReady = true;
+        types = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/activity-types") ?? new();
+        await LoadActivities();
+        StateHasChanged();
+    }
+
+    private async Task LoadActivities()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var query = new Dictionary<string, string?>();
+            if (!string.IsNullOrWhiteSpace(search))
+                query["search"] = search.Trim();
+            if (typeId.HasValue)
+                query["typeId"] = typeId.Value.ToString();
+            query["sortBy"] = "startsAt";
+            query["sortDir"] = "asc";
+
+            var url = QueryHelpers.AddQueryString("api/activities", query);
+            activities = await Http.GetFromJsonAsync<List<ActivityDto>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Aktivnosti nije moguće učitati: {ex.Message}";
+            activities = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        search = null;
+        typeId = null;
+        await LoadActivities();
+    }
+}
