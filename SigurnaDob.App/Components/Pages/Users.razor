@@ -1,0 +1,277 @@
+@page "/users"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.WebUtilities
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Korisnički računi</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Korisnički računi</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">Upravljanje računima, ulogama i poveznicama s profilima</MudText>
+</div>
+
+<MudButton Variant="Variant.Filled"
+           Color="Color.Primary"
+           Href="/users/create"
+           Class="mb-4"
+           StartIcon="@Icons.Material.Filled.PersonAdd">
+    Novi račun
+</MudButton>
+
+<MudPaper Class="pa-4 filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="search"
+                          Label="Pretraži"
+                          Placeholder="Email ili ime"
+                          Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="bool?"
+                       Label="Status"
+                       @bind-Value="isActive"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="bool?" Value="@((bool?)true)">Aktivan</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)false)">Neaktivan</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int?"
+                       Label="Uloga"
+                       @bind-Value="roleId"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                @foreach (var role in roles)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)role.Id)">@role.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadUsers">
+                Primijeni
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetFilters">
+                Očisti
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">@successMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudTable Items="users" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+        <HeaderContent>
+            <MudTh>Račun</MudTh>
+            <MudTh>Uloge</MudTh>
+            <MudTh>Profil</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Akcije</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                @context.DisplayName
+                <MudText Typo="Typo.caption" Class="page-subtitle">@context.Email</MudText>
+            </MudTd>
+            <MudTd>
+                <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1">
+                    @foreach (var role in context.Roles)
+                    {
+                        <MudChip T="string" Size="Size.Small">@role</MudChip>
+                    }
+                </MudStack>
+            </MudTd>
+            <MudTd>@(context.ProfileSummary ?? "—")</MudTd>
+            <MudTd>
+                @if (context.IsActive)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Aktivan</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default">Neaktivan</MudChip>
+                }
+            </MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Primary"
+                           Href="@($"/users/edit/{context.Id}")">
+                    Uredi
+                </MudButton>
+                @if (context.IsActive && context.Id != CurrentUser.User?.Id)
+                {
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Error"
+                               Size="Size.Small"
+                               OnClick="@(() => DeactivateUser(context.Id))"
+                               Disabled="@(busyUserId == context.Id)">
+                        Deaktiviraj
+                    </MudButton>
+                }
+                else if (!context.IsActive)
+                {
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Success"
+                               Size="Size.Small"
+                               OnClick="@(() => ActivateUser(context.Id))"
+                               Disabled="@(busyUserId == context.Id)">
+                        Aktiviraj
+                    </MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nema računa za zadane filtere.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<AppUserDto> users = new();
+    private List<LookupDto> roles = new();
+    private string? search;
+    private bool? isActive;
+    private int? roleId;
+    private bool isLoading = true;
+    private int? busyUserId;
+    private string? errorMessage;
+    private string? successMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        authReady = true;
+        roles = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/app-roles") ?? new();
+        await LoadUsers();
+        StateHasChanged();
+    }
+
+    private async Task LoadUsers()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var query = new Dictionary<string, string?>();
+            if (!string.IsNullOrWhiteSpace(search))
+                query["search"] = search.Trim();
+            if (isActive.HasValue)
+                query["isActive"] = isActive.Value.ToString().ToLowerInvariant();
+            if (roleId.HasValue)
+                query["roleId"] = roleId.Value.ToString();
+            query["sortBy"] = "displayName";
+            query["sortDir"] = "asc";
+
+            var url = QueryHelpers.AddQueryString("api/users", query);
+            users = await Http.GetFromJsonAsync<List<AppUserDto>>(url) ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Račune nije moguće učitati: {ex.Message}";
+            users = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ResetFilters()
+    {
+        search = null;
+        isActive = null;
+        roleId = null;
+        await LoadUsers();
+    }
+
+    private async Task DeactivateUser(int userId)
+    {
+        busyUserId = userId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.PutAsync($"api/users/{userId}/deactivate", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Račun je deaktiviran.";
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busyUserId = null;
+        }
+    }
+
+    private async Task ActivateUser(int userId)
+    {
+        busyUserId = userId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var response = await Http.PutAsync($"api/users/{userId}/activate", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            successMessage = "Račun je aktiviran.";
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busyUserId = null;
+        }
+    }
+}

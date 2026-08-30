@@ -78,6 +78,13 @@
                         Moji zadaci
                     </MudNavLink>
                 }
+
+                @if (CurrentUser.HasAnyRole(AppRoles.Admin))
+                {
+                    <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts">
+                        Korisnički računi
+                    </MudNavLink>
+                }
             </MudNavMenu>
         </div>
 

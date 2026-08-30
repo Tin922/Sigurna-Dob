@@ -108,4 +108,37 @@ public class LookupsController : ControllerBase
                 Name = resident.FirstName + " " + resident.LastName
             })
             .ToListAsync());
+
+    [HttpGet("app-roles")]
+    public async Task<ActionResult<List<LookupDto>>> GetAppRoles() =>
+        Ok(await _context.AppRoles
+            .OrderBy(role => role.Id)
+            .Select(role => new LookupDto { Id = role.Id, Name = role.DisplayName })
+            .ToListAsync());
+
+    [HttpGet("employees")]
+    public async Task<ActionResult<List<LookupDto>>> GetEmployees() =>
+        Ok(await _context.Employees
+            .Where(employee => employee.EmployeeStatusId == 1)
+            .OrderBy(employee => employee.LastName)
+            .ThenBy(employee => employee.FirstName)
+            .Select(employee => new LookupDto
+            {
+                Id = employee.Id,
+                Name = employee.FirstName + " " + employee.LastName
+            })
+            .ToListAsync());
+
+    [HttpGet("family-contacts")]
+    public async Task<ActionResult<List<LookupDto>>> GetFamilyContacts() =>
+        Ok(await _context.FamilyContacts
+            .OrderBy(contact => contact.LastName)
+            .ThenBy(contact => contact.FirstName)
+            .Select(contact => new LookupDto
+            {
+                Id = contact.Id,
+                Name = contact.FirstName + " " + contact.LastName +
+                       (contact.Relationship != null ? " (" + contact.Relationship + ")" : string.Empty)
+            })
+            .ToListAsync());
 }

@@ -1,0 +1,167 @@
+@page "/users/create"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Novi korisnički račun</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Novi korisnički račun</MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+<MudStack Spacing="2" Style="max-width: 560px">
+    <MudTextField @bind-Value="model.Email" Label="Email" Required="true" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="model.DisplayName" Label="Prikazano ime" Required="true" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="model.Password"
+                  Label="Lozinka"
+                  InputType="InputType.Password"
+                  Required="true"
+                  Variant="Variant.Outlined"
+                  HelperText="Najmanje 8 znakova" />
+
+    <MudSelect T="int"
+               Label="Uloge"
+               MultiSelection="true"
+               @bind-SelectedValues="selectedRoleIds"
+               Variant="Variant.Outlined"
+               Required="true">
+        @foreach (var role in roles)
+        {
+            <MudSelectItem Value="@role.Id">@role.Name</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudSelect T="string"
+               Label="Poveznica profila"
+               @bind-Value="profileLinkType"
+               Variant="Variant.Outlined">
+        <MudSelectItem Value="@ProfileLinkNone">Bez poveznice</MudSelectItem>
+        <MudSelectItem Value="@ProfileLinkEmployee">Djelatnik</MudSelectItem>
+        <MudSelectItem Value="@ProfileLinkFamily">Obiteljski kontakt</MudSelectItem>
+    </MudSelect>
+
+    @if (profileLinkType == ProfileLinkEmployee)
+    {
+        <MudSelect T="int?"
+                   Label="Djelatnik"
+                   @bind-Value="model.EmployeeId"
+                   Variant="Variant.Outlined"
+                   Clearable="true">
+            @foreach (var employee in employees)
+            {
+                <MudSelectItem T="int?" Value="@((int?)employee.Id)">@employee.Name</MudSelectItem>
+            }
+        </MudSelect>
+    }
+    else if (profileLinkType == ProfileLinkFamily)
+    {
+        <MudSelect T="int?"
+                   Label="Obiteljski kontakt"
+                   @bind-Value="model.FamilyContactId"
+                   Variant="Variant.Outlined"
+                   Clearable="true">
+            @foreach (var contact in familyContacts)
+            {
+                <MudSelectItem T="int?" Value="@((int?)contact.Id)">@contact.Name</MudSelectItem>
+            }
+        </MudSelect>
+    }
+
+    <MudSwitch @bind-Value="model.IsActive" Label="Račun aktivan" Color="Color.Primary" />
+
+    <MudStack Row="true" Spacing="2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+            @(isSaving ? "Spremanje..." : "Spremi")
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Href="/users">Odustani</MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    private const string ProfileLinkNone = "none";
+    private const string ProfileLinkEmployee = "employee";
+    private const string ProfileLinkFamily = "family";
+
+    private SaveAppUserDto model = new() { IsActive = true };
+    private IReadOnlyCollection<int> selectedRoleIds = new HashSet<int> { 1 };
+    private List<LookupDto> roles = new();
+    private List<LookupDto> employees = new();
+    private List<LookupDto> familyContacts = new();
+    private string profileLinkType = ProfileLinkNone;
+    private bool isSaving;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin))
+        {
+            Navigation.NavigateTo("/users");
+            return;
+        }
+
+        authReady = true;
+        await LoadLookups();
+        StateHasChanged();
+    }
+
+    private async Task LoadLookups()
+    {
+        roles = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/app-roles") ?? new();
+        employees = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/employees") ?? new();
+        familyContacts = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/family-contacts") ?? new();
+    }
+
+    private async Task Save()
+    {
+        errorMessage = null;
+        ApplyProfileLink();
+        model.RoleIds = selectedRoleIds.Distinct().ToList();
+        isSaving = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/users", model);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(errorMessage))
+                    errorMessage = "Spremanje nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo("/users");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ApplyProfileLink()
+    {
+        model.EmployeeId = profileLinkType == ProfileLinkEmployee ? model.EmployeeId : null;
+        model.FamilyContactId = profileLinkType == ProfileLinkFamily ? model.FamilyContactId : null;
+    }
+}
