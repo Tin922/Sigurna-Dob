@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using SigurnaDob.Api.Configuration;
 using SigurnaDob.Api.Data;
 using SigurnaDob.Api.Security;
+using SigurnaDob.Api.Services;
 using SigurnaDob.Api.Swagger;
 using SigurnaDob.Shared.Constants;
 
@@ -44,6 +46,9 @@ if (jwtOptions.SigningKey.Length < 32)
 
 builder.Services.Configure<JwtOptions>(jwtSection);
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.Configure<FileUploadOptions>(
+    builder.Configuration.GetSection(FileUploadOptions.SectionName));
+builder.Services.AddScoped<ResidentMediaStorageService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

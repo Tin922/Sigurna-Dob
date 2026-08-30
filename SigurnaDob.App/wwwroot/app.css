@@ -131,3 +131,14 @@ h1:focus {
     background: #FFFCF8 !important;
     border-radius: 12px !important;
 }
+
+.upload-panel {
+    border: 1px dashed #B8CECE !important;
+    background: #F8FBFB !important;
+    border-radius: 12px !important;
+}
+
+.upload-panel ::deep .mud-file-upload-list,
+.upload-panel ::deep .mud-chip-set {
+    display: none !important;
+}

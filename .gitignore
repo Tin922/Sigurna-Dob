@@ -11,6 +11,7 @@ db-backups/
 
 # Uploaded media from local testing
 **/wwwroot/uploads/
+**/uploads/
 
 # Local notes with demo passwords
 demo-korisnici.txt

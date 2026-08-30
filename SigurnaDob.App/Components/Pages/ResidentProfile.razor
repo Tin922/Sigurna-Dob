@@ -2,6 +2,8 @@
 @rendermode InteractiveServer
 
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Headers
 @using SigurnaDob.App.Services
 @using SigurnaDob.Shared.Constants
 @using SigurnaDob.Shared.Dtos
@@ -9,6 +11,8 @@
 @inject HttpClient Http
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject IJSRuntime JS
 
 <PageTitle>Profil korisnika</PageTitle>
 
@@ -131,6 +135,139 @@ else
         }
     </MudPaper>
 
+    <MudPaper Class="pa-4 mt-4 content-card" Elevation="0">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">Dokumenti i slike</MudText>
+
+        @if (!string.IsNullOrWhiteSpace(mediaErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3">@mediaErrorMessage</MudAlert>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(mediaSuccessMessage))
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-3">@mediaSuccessMessage</MudAlert>
+        }
+
+        @if (isLoadingMedia)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else
+        {
+            <MudTable Items="mediaFiles" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Datoteka</MudTh>
+                    <MudTh>Vrsta</MudTh>
+                    <MudTh>Veličina</MudTh>
+                    <MudTh>Učitano</MudTh>
+                    <MudTh>Akcije</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.body2">@context.OriginalFileName</MudText>
+                            @if (!string.IsNullOrWhiteSpace(context.Caption))
+                            {
+                                <MudText Typo="Typo.caption" Class="page-subtitle">@context.Caption</MudText>
+                            }
+                        </MudStack>
+                    </MudTd>
+                    <MudTd>@context.MediaTypeName</MudTd>
+                    <MudTd>@FormatFileSize(context.FileSizeBytes)</MudTd>
+                    <MudTd>@context.UploadedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => DownloadMedia(context))"
+                                   Disabled="@(busyMediaId == context.Id)">
+                            Preuzmi
+                        </MudButton>
+                        @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+                        {
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => DeleteMedia(context.Id))"
+                                       Disabled="@(busyMediaId == context.Id)">
+                                Obriši
+                            </MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Class="pa-4">Nema učitane dokumentacije za ovog korisnika.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+        }
+
+        @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        {
+            <MudExpansionPanels Class="mt-4">
+                <MudExpansionPanel Text="Dodaj novu datoteku" @bind-Expanded="uploadPanelExpanded">
+                    <MudPaper Class="pa-4 upload-panel" Elevation="0">
+                        <MudStack Spacing="2">
+                            <MudFileUpload T="IBrowserFile"
+                                           @key="fileUploadKey"
+                                           @bind-Files="selectedFile"
+                                           Accept=".pdf,.jpg,.jpeg,.png"
+                                           MaximumFileCount="1"
+                                           Disabled="@isUploading">
+                                <CustomContent>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                                               OnClick="@context.OpenFilePickerAsync"
+                                               Disabled="@isUploading">
+                                        Odaberi datoteku
+                                    </MudButton>
+                                </CustomContent>
+                                <SelectedTemplate Context="fileContext" />
+                            </MudFileUpload>
+
+                            <MudTextField Value="@SelectedFileLabel"
+                                          Label="Odabrana datoteka"
+                                          Variant="Variant.Outlined"
+                                          ReadOnly="true"
+                                          Placeholder="Još nije odabrana datoteka"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Outlined.InsertDriveFile" />
+
+                            <MudTextField @bind-Value="uploadCaption"
+                                          Label="Opis (opcionalno)"
+                                          Variant="Variant.Outlined" />
+
+                            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Upload"
+                                           OnClick="UploadSelectedFile"
+                                           Disabled="@(selectedFile is null || isUploading)">
+                                    @(isUploading ? "Učitavanje..." : "Učitaj datoteku")
+                                </MudButton>
+                                @if (selectedFile is not null && !isUploading)
+                                {
+                                    <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="ClearSelectedFile">
+                                        Očisti
+                                    </MudButton>
+                                }
+                            </MudStack>
+
+                            @if (isUploading)
+                            {
+                                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-1" />
+                            }
+
+                            <MudText Typo="Typo.caption" Class="page-subtitle">
+                                Dopušteno: PDF, JPG, PNG — najviše 5 MB
+                            </MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+    </MudPaper>
+
     <MudButton Href="/residents" Variant="Variant.Text" Class="mt-4">← Natrag na popis</MudButton>
 }
 
@@ -139,10 +276,22 @@ else
 
     private ResidentDetailDto? resident;
     private List<FamilyContactDto> familyContacts = new();
+    private List<ResidentMediaDto> mediaFiles = new();
     private bool isLoading = true;
     private bool isLoadingContacts = true;
+    private bool isLoadingMedia = true;
+    private bool isUploading;
+    private int? busyMediaId;
+    private IBrowserFile? selectedFile;
+    private int fileUploadKey;
+    private bool uploadPanelExpanded;
+    private string? uploadCaption;
     private string? contactsErrorMessage;
+    private string? mediaErrorMessage;
+    private string? mediaSuccessMessage;
     private bool authReady;
+
+    private const long MaxUploadBytes = 5 * 1024 * 1024;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -161,7 +310,168 @@ else
         authReady = true;
         await LoadResident();
         await LoadFamilyContacts();
+        await LoadMedia();
         StateHasChanged();
+    }
+
+    private async Task LoadMedia()
+    {
+        isLoadingMedia = true;
+        mediaErrorMessage = null;
+
+        try
+        {
+            mediaFiles = await Http.GetFromJsonAsync<List<ResidentMediaDto>>($"api/residents/{Id}/media") ?? new();
+        }
+        catch (Exception ex)
+        {
+            mediaErrorMessage = $"Datoteke nije moguće učitati: {ex.Message}";
+            mediaFiles = new();
+        }
+        finally
+        {
+            isLoadingMedia = false;
+        }
+    }
+
+    private string SelectedFileLabel => selectedFile is null
+        ? string.Empty
+        : $"{selectedFile.Name} ({FormatFileSize(selectedFile.Size)})";
+
+    private void ClearSelectedFile()
+    {
+        selectedFile = null;
+        fileUploadKey++;
+        mediaErrorMessage = null;
+    }
+
+    private void ResetFilePicker()
+    {
+        selectedFile = null;
+        fileUploadKey++;
+        uploadPanelExpanded = false;
+    }
+
+    private async Task UploadSelectedFile()
+    {
+        if (selectedFile is null)
+            return;
+
+        mediaErrorMessage = null;
+        mediaSuccessMessage = null;
+
+        if (selectedFile.Size > MaxUploadBytes)
+        {
+            mediaErrorMessage = "Datoteka premašuje maksimalnu veličinu od 5 MB.";
+            return;
+        }
+
+        isUploading = true;
+
+        try
+        {
+            await using var stream = selectedFile.OpenReadStream(MaxUploadBytes);
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(stream);
+            streamContent.Headers.ContentType = new MediaTypeHeaderValue(
+                string.IsNullOrWhiteSpace(selectedFile.ContentType)
+                    ? "application/octet-stream"
+                    : selectedFile.ContentType);
+            content.Add(streamContent, "file", selectedFile.Name);
+
+            if (!string.IsNullOrWhiteSpace(uploadCaption))
+                content.Add(new StringContent(uploadCaption.Trim()), "caption");
+
+            var response = await Http.PostAsync($"api/residents/{Id}/media", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                mediaErrorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            selectedFile = null;
+            uploadCaption = null;
+            ResetFilePicker();
+            mediaSuccessMessage = "Datoteka je učitana.";
+            await LoadMedia();
+        }
+        catch (Exception ex)
+        {
+            mediaErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task DownloadMedia(ResidentMediaDto media)
+    {
+        busyMediaId = media.Id;
+        mediaErrorMessage = null;
+
+        try
+        {
+            var bytes = await Http.GetByteArrayAsync($"api/residents/{Id}/media/{media.Id}/download");
+            var base64 = Convert.ToBase64String(bytes);
+            await JS.InvokeVoidAsync("sigurnaDobDownload", media.OriginalFileName, media.ContentType, base64);
+        }
+        catch (Exception ex)
+        {
+            mediaErrorMessage = $"Preuzimanje nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            busyMediaId = null;
+        }
+    }
+
+    private async Task DeleteMedia(int mediaId)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, "Jeste li sigurni da želite obrisati ovu datoteku?" },
+            { x => x.ConfirmText, "Obriši" }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Obriši datoteku", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled)
+            return;
+
+        busyMediaId = mediaId;
+        mediaErrorMessage = null;
+        mediaSuccessMessage = null;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/residents/{Id}/media/{mediaId}");
+            if (!response.IsSuccessStatusCode)
+            {
+                mediaErrorMessage = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            mediaSuccessMessage = "Datoteka je obrisana.";
+            await LoadMedia();
+        }
+        catch (Exception ex)
+        {
+            mediaErrorMessage = ex.Message;
+        }
+        finally
+        {
+            busyMediaId = null;
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024)
+            return $"{bytes} B";
+        if (bytes < 1024 * 1024)
+            return $"{bytes / 1024.0:0.#} KB";
+        return $"{bytes / (1024.0 * 1024.0):0.#} MB";
     }
 
     private async Task LoadFamilyContacts()
