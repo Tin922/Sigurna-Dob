@@ -1,0 +1,80 @@
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Povijest zadatka</MudText>
+        @if (!string.IsNullOrWhiteSpace(TaskTitle))
+        {
+            <MudText Typo="Typo.body2" Class="page-subtitle">@TaskTitle</MudText>
+        }
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <div class="d-flex justify-center py-4">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+        }
+        else if (history.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="page-subtitle">Nema zabilježenih promjena.</MudText>
+        }
+        else
+        {
+            <MudTable Items="history" Dense="true" Hover="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Datum</MudTh>
+                    <MudTh>Vrsta</MudTh>
+                    <MudTh>Promjena</MudTh>
+                    <MudTh>Promijenio</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ChangedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                    <MudTd>@context.ChangeType</MudTd>
+                    <MudTd>@context.Description</MudTd>
+                    <MudTd>@context.ChangedByName</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Zatvori</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public int TaskId { get; set; }
+    [Parameter] public string TaskTitle { get; set; } = string.Empty;
+
+    private List<CareTaskChangeHistoryDto> history = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            history = await Http.GetFromJsonAsync<List<CareTaskChangeHistoryDto>>(
+                $"api/caretasks/{TaskId}/history") ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Povijest nije dostupna: {ex.Message}";
+            history = new();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+}

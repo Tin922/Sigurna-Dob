@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SigurnaDob.Api.Data;
 
@@ -10,9 +11,11 @@ using SigurnaDob.Api.Data;
 namespace SigurnaDob.Api.Migrations
 {
     [DbContext(typeof(SigurnaDobDbContext))]
-    partial class SigurnaDobDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905125237_AddChangeHistory")]
+    partial class AddChangeHistory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");

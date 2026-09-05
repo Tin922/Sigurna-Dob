@@ -32,6 +32,8 @@ public class SigurnaDobDbContext : DbContext
     public DbSet<Activity> Activities => Set<Activity>();
     public DbSet<ResidentActivity> ResidentActivities => Set<ResidentActivity>();
     public DbSet<ResidentMedia> ResidentMedia => Set<ResidentMedia>();
+    public DbSet<ResidentStatusHistory> ResidentStatusHistories => Set<ResidentStatusHistory>();
+    public DbSet<CareTaskChangeHistory> CareTaskChangeHistories => Set<CareTaskChangeHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -263,6 +265,54 @@ public class SigurnaDobDbContext : DbContext
             .WithMany(resident => resident.Media)
             .HasForeignKey(media => media.ResidentId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ResidentStatusHistory>()
+            .HasOne(entry => entry.Resident)
+            .WithMany()
+            .HasForeignKey(entry => entry.ResidentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ResidentStatusHistory>()
+            .HasOne(entry => entry.FromStatus)
+            .WithMany()
+            .HasForeignKey(entry => entry.FromStatusId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ResidentStatusHistory>()
+            .HasOne(entry => entry.ToStatus)
+            .WithMany()
+            .HasForeignKey(entry => entry.ToStatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CareTaskChangeHistory>()
+            .HasOne(entry => entry.CareTask)
+            .WithMany()
+            .HasForeignKey(entry => entry.CareTaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CareTaskChangeHistory>()
+            .HasOne(entry => entry.FromStatus)
+            .WithMany()
+            .HasForeignKey(entry => entry.FromStatusId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<CareTaskChangeHistory>()
+            .HasOne(entry => entry.ToStatus)
+            .WithMany()
+            .HasForeignKey(entry => entry.ToStatusId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<CareTaskChangeHistory>()
+            .HasOne(entry => entry.FromCaregiver)
+            .WithMany()
+            .HasForeignKey(entry => entry.FromCaregiverId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<CareTaskChangeHistory>()
+            .HasOne(entry => entry.ToCaregiver)
+            .WithMany()
+            .HasForeignKey(entry => entry.ToCaregiverId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         SeedLookupData(modelBuilder);
     }

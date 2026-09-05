@@ -57,30 +57,35 @@ else
             <MudTd>@context.StatusName</MudTd>
             <MudTd>@(context.DueAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")</MudTd>
             <MudTd>
-                @if (context.CareTaskStatusId == CareTaskStatusIds.Assigned)
-                {
-                    <MudButton Variant="Variant.Outlined"
-                               Color="Color.Primary"
+                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                    @if (context.CareTaskStatusId == CareTaskStatusIds.Assigned)
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => StartTask(context.Id))"
+                                   Disabled="@(busyTaskId == context.Id)">
+                            Pokreni
+                        </MudButton>
+                    }
+                    else if (context.CareTaskStatusId == CareTaskStatusIds.InProgress)
+                    {
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Secondary"
+                                   Size="Size.Small"
+                                   OnClick="@(() => CompleteTask(context))"
+                                   Disabled="@(busyTaskId == context.Id)">
+                            Završi
+                        </MudButton>
+                    }
+
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Default"
                                Size="Size.Small"
-                               OnClick="@(() => StartTask(context.Id))"
-                               Disabled="@(busyTaskId == context.Id)">
-                        Pokreni
+                               OnClick="@(() => ShowHistory(context))">
+                        Povijest
                     </MudButton>
-                }
-                else if (context.CareTaskStatusId == CareTaskStatusIds.InProgress)
-                {
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Secondary"
-                               Size="Size.Small"
-                               OnClick="@(() => CompleteTask(context))"
-                               Disabled="@(busyTaskId == context.Id)">
-                        Završi
-                    </MudButton>
-                }
-                else
-                {
-                    <MudText Typo="Typo.caption">—</MudText>
-                }
+                </MudStack>
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>
@@ -212,5 +217,22 @@ else
         {
             busyTaskId = null;
         }
+    }
+
+    private async Task ShowHistory(CareTaskDto task)
+    {
+        var parameters = new DialogParameters<CareTaskHistoryDialog>
+        {
+            { x => x.TaskId, task.Id },
+            { x => x.TaskTitle, task.Title }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        await DialogService.ShowAsync<CareTaskHistoryDialog>("Povijest zadatka", parameters, options);
     }
 }

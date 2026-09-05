@@ -17,10 +17,14 @@ namespace SigurnaDob.Api.Controllers;
 public class CareTasksController : ControllerBase
 {
     private readonly SigurnaDobDbContext _context;
+    private readonly ChangeHistoryService _changeHistory;
 
-    public CareTasksController(SigurnaDobDbContext context)
+    public CareTasksController(
+        SigurnaDobDbContext context,
+        ChangeHistoryService changeHistory)
     {
         _context = context;
+        _changeHistory = changeHistory;
     }
 
     [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
@@ -102,6 +106,19 @@ public class CareTasksController : ControllerBase
         return Ok(ToDetailDto(task));
     }
 
+    [HttpGet("{id:int}/history")]
+    public async Task<ActionResult<List<CareTaskChangeHistoryDto>>> GetCareTaskHistory(int id)
+    {
+        var task = await _context.CareTasks.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id);
+        if (task is null)
+            return NotFound();
+
+        if (!CanAccessTask(task))
+            return Forbid();
+
+        return Ok(await _changeHistory.GetCareTaskHistoryAsync(id));
+    }
+
     [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
     [HttpPost]
     public async Task<ActionResult<CareTaskDetailDto>> CreateCareTask(SaveCareTaskDto dto)
@@ -136,6 +153,18 @@ public class CareTasksController : ControllerBase
         _context.CareTasks.Add(task);
         await _context.SaveChangesAsync();
 
+        _changeHistory.RecordCareTaskStatusChange(task.Id, null, statusId, User);
+        if (dto.CaregiverId.HasValue)
+        {
+            _changeHistory.RecordCareTaskAssignmentChange(
+                task.Id,
+                null,
+                dto.CaregiverId,
+                User);
+        }
+
+        await _context.SaveChangesAsync();
+
         return CreatedAtAction(
             nameof(GetCareTaskById),
             new { id = task.Id },
@@ -158,6 +187,9 @@ public class CareTasksController : ControllerBase
         if (updateError is not null)
             return BadRequest(updateError);
 
+        var previousStatusId = task.CareTaskStatusId;
+        var previousCaregiverId = task.CaregiverId;
+
         task.Title = dto.Title.Trim();
         task.Description = NormalizeOptional(dto.Description);
         task.ResidentId = dto.ResidentId;
@@ -175,6 +207,17 @@ public class CareTasksController : ControllerBase
             task.CareTaskStatusId =
                 CareTaskBusinessRules.ResolveStatusOnAssignment(dto.CaregiverId, task.CareTaskStatusId);
         }
+
+        _changeHistory.RecordCareTaskAssignmentChange(
+            task.Id,
+            previousCaregiverId,
+            task.CaregiverId,
+            User);
+        _changeHistory.RecordCareTaskStatusChange(
+            task.Id,
+            previousStatusId,
+            task.CareTaskStatusId,
+            User);
 
         await _context.SaveChangesAsync();
         return Ok(await LoadDetailDto(id));
@@ -196,9 +239,16 @@ public class CareTasksController : ControllerBase
         if (startError is not null)
             return BadRequest(startError);
 
+        var previousStatusId = task.CareTaskStatusId;
         task.CareTaskStatusId = CareTaskStatusIds.InProgress;
         task.StartedAt = DateTime.UtcNow;
         task.UpdatedAt = DateTime.UtcNow;
+
+        _changeHistory.RecordCareTaskStatusChange(
+            task.Id,
+            previousStatusId,
+            task.CareTaskStatusId,
+            User);
 
         await _context.SaveChangesAsync();
         return Ok(await LoadDetailDto(id));
@@ -222,10 +272,17 @@ public class CareTasksController : ControllerBase
         if (completeError is not null)
             return BadRequest(completeError);
 
+        var previousStatusId = task.CareTaskStatusId;
         task.CareTaskStatusId = CareTaskStatusIds.Completed;
         task.CompletedAt = dto.CompletedAt ?? DateTime.UtcNow;
         task.CompletionNote = dto.CompletionNote.Trim();
         task.UpdatedAt = DateTime.UtcNow;
+
+        _changeHistory.RecordCareTaskStatusChange(
+            task.Id,
+            previousStatusId,
+            task.CareTaskStatusId,
+            User);
 
         await _context.SaveChangesAsync();
         return Ok(await LoadDetailDto(id));

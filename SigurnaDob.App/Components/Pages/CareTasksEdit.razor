@@ -33,7 +33,7 @@ else if (isReadOnly)
     <MudAlert Severity="Severity.Info" Class="mb-4">
         Ovaj zadatak je @currentStatus.ToLower() i više se ne može uređivati.
     </MudAlert>
-    <MudButton Variant="Variant.Outlined" Href="/care-tasks">Natrag</MudButton>
+    <MudButton Variant="Variant.Outlined" Href="/care-tasks" Class="mb-4">Natrag</MudButton>
 }
 else
 {
@@ -91,6 +91,39 @@ else
     </MudStack>
 }
 
+@if (!isLoading)
+{
+    <MudPaper Class="pa-4 mt-4 content-card" Elevation="0" Style="max-width: 760px">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">Povijest zadatka</MudText>
+
+        @if (isLoadingHistory)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else if (taskHistory.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="page-subtitle">Nema zabilježenih promjena.</MudText>
+        }
+        else
+        {
+            <MudTable Items="taskHistory" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Datum</MudTh>
+                    <MudTh>Vrsta</MudTh>
+                    <MudTh>Promjena</MudTh>
+                    <MudTh>Promijenio</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ChangedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                    <MudTd>@context.ChangeType</MudTd>
+                    <MudTd>@context.Description</MudTd>
+                    <MudTd>@context.ChangedByName</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
 @code {
     [Parameter] public int Id { get; set; }
 
@@ -98,6 +131,7 @@ else
     private List<LookupDto> residents = new();
     private List<LookupDto> types = new();
     private List<LookupDto> caregivers = new();
+    private List<CareTaskChangeHistoryDto> taskHistory = new();
     private DateTime? dueDate;
     private TimeSpan? dueTime;
     private bool cancelTask;
@@ -105,6 +139,7 @@ else
     private string currentStatus = string.Empty;
     private bool isReadOnly;
     private bool isLoading = true;
+    private bool isLoadingHistory = true;
     private bool isSaving;
     private string? errorMessage;
     private bool authReady;
@@ -176,6 +211,27 @@ else
         finally
         {
             isLoading = false;
+        }
+
+        await LoadHistory();
+    }
+
+    private async Task LoadHistory()
+    {
+        isLoadingHistory = true;
+
+        try
+        {
+            taskHistory = await Http.GetFromJsonAsync<List<CareTaskChangeHistoryDto>>(
+                $"api/caretasks/{Id}/history") ?? new();
+        }
+        catch
+        {
+            taskHistory = new();
+        }
+        finally
+        {
+            isLoadingHistory = false;
         }
     }
 

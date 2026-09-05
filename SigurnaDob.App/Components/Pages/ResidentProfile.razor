@@ -62,6 +62,38 @@ else
     </MudGrid>
 
     <MudPaper Class="pa-4 mt-4 content-card" Elevation="0">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">Povijest statusa</MudText>
+
+        @if (isLoadingStatusHistory)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else if (statusHistory.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="page-subtitle">Nema zabilježenih promjena statusa.</MudText>
+        }
+        else
+        {
+            <MudTable Items="statusHistory" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Datum</MudTh>
+                    <MudTh>Promjena</MudTh>
+                    <MudTh>Promijenio</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ChangedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                    <MudTd>
+                        @(string.IsNullOrWhiteSpace(context.FromStatusName)
+                            ? context.ToStatusName
+                            : $"{context.FromStatusName} → {context.ToStatusName}")
+                    </MudTd>
+                    <MudTd>@context.ChangedByName</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mt-4 content-card" Elevation="0">
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
             <MudText Typo="Typo.subtitle1">Obiteljski kontakti</MudText>
             @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
@@ -277,9 +309,11 @@ else
     private ResidentDetailDto? resident;
     private List<FamilyContactDto> familyContacts = new();
     private List<ResidentMediaDto> mediaFiles = new();
+    private List<ResidentStatusHistoryDto> statusHistory = new();
     private bool isLoading = true;
     private bool isLoadingContacts = true;
     private bool isLoadingMedia = true;
+    private bool isLoadingStatusHistory = true;
     private bool isUploading;
     private int? busyMediaId;
     private IBrowserFile? selectedFile;
@@ -309,9 +343,29 @@ else
 
         authReady = true;
         await LoadResident();
+        await LoadStatusHistory();
         await LoadFamilyContacts();
         await LoadMedia();
         StateHasChanged();
+    }
+
+    private async Task LoadStatusHistory()
+    {
+        isLoadingStatusHistory = true;
+
+        try
+        {
+            statusHistory = await Http.GetFromJsonAsync<List<ResidentStatusHistoryDto>>(
+                $"api/residents/{Id}/status-history") ?? new();
+        }
+        catch
+        {
+            statusHistory = new();
+        }
+        finally
+        {
+            isLoadingStatusHistory = false;
+        }
     }
 
     private async Task LoadMedia()

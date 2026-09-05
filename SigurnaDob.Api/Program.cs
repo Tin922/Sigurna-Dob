@@ -50,6 +50,7 @@ builder.Services.Configure<FileUploadOptions>(
     builder.Configuration.GetSection(FileUploadOptions.SectionName));
 builder.Services.AddScoped<ResidentMediaStorageService>();
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<ChangeHistoryService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

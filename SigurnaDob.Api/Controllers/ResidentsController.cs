@@ -15,10 +15,14 @@ namespace SigurnaDob.Api.Controllers;
 public class ResidentsController : ControllerBase
 {
     private readonly SigurnaDobDbContext _context;
+    private readonly ChangeHistoryService _changeHistory;
 
-    public ResidentsController(SigurnaDobDbContext context)
+    public ResidentsController(
+        SigurnaDobDbContext context,
+        ChangeHistoryService changeHistory)
     {
         _context = context;
+        _changeHistory = changeHistory;
     }
 
     [HttpGet]
@@ -90,6 +94,16 @@ public class ResidentsController : ControllerBase
         return Ok(ToDetailDto(resident, familyContactCount));
     }
 
+    [HttpGet("{id:int}/status-history")]
+    public async Task<ActionResult<List<ResidentStatusHistoryDto>>> GetResidentStatusHistory(int id)
+    {
+        var exists = await _context.Residents.AsNoTracking().AnyAsync(resident => resident.Id == id);
+        if (!exists)
+            return NotFound();
+
+        return Ok(await _changeHistory.GetResidentStatusHistoryAsync(id));
+    }
+
     [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
     [HttpPost]
     public async Task<ActionResult<ResidentDetailDto>> CreateResident(SaveResidentDto dto)
@@ -115,6 +129,14 @@ public class ResidentsController : ControllerBase
         _context.Residents.Add(resident);
         await _context.SaveChangesAsync();
 
+        _changeHistory.RecordResidentStatusChange(
+            resident.Id,
+            null,
+            resident.ResidentStatusId,
+            User);
+
+        await _context.SaveChangesAsync();
+
         return CreatedAtAction(
             nameof(GetResidentById),
             new { id = resident.Id },
@@ -135,6 +157,8 @@ public class ResidentsController : ControllerBase
         if (validationError is not null)
             return BadRequest(validationError);
 
+        var previousStatusId = resident.ResidentStatusId;
+
         resident.FirstName = dto.FirstName.Trim();
         resident.LastName = dto.LastName.Trim();
         resident.DateOfBirth = dto.DateOfBirth;
@@ -145,6 +169,12 @@ public class ResidentsController : ControllerBase
         resident.Note = NormalizeOptional(dto.Note);
 
         ResidentBusinessRules.ApplyStatusSideEffects(resident);
+
+        _changeHistory.RecordResidentStatusChange(
+            resident.Id,
+            previousStatusId,
+            resident.ResidentStatusId,
+            User);
 
         await _context.SaveChangesAsync();
 
