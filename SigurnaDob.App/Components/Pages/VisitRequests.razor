@@ -95,7 +95,7 @@ else
             <MudTd>@context.RequestedVisitAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
             <MudTd>@(context.DecisionNote ?? "—")</MudTd>
             <MudTd>
-                @if (context.VisitRequestStatusId == VisitRequestStatusIds.Received)
+                @if (canManage && context.VisitRequestStatusId == VisitRequestStatusIds.Received)
                 {
                     <MudButton Variant="Variant.Outlined"
                                Color="Color.Success"
@@ -113,7 +113,7 @@ else
                         Odbij
                     </MudButton>
                 }
-                else if (context.VisitRequestStatusId == VisitRequestStatusIds.Approved)
+                else if (canManage && context.VisitRequestStatusId == VisitRequestStatusIds.Approved)
                 {
                     <MudButton Variant="Variant.Filled"
                                Color="Color.Primary"
@@ -131,7 +131,7 @@ else
                         Otkaži
                     </MudButton>
                 }
-                else if (context.VisitRequestStatusId is not (
+                else if (canManage && context.VisitRequestStatusId is not (
                     VisitRequestStatusIds.Held or VisitRequestStatusIds.Cancelled))
                 {
                     <MudButton Variant="Variant.Text"
@@ -162,6 +162,7 @@ else
     private int? statusId;
     private int? residentId;
     private bool isLoading = true;
+    private bool canManage;
     private int? busyRequestId;
     private string? errorMessage;
     private string? successMessage;
@@ -175,12 +176,13 @@ else
         if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
             return;
 
-        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
         {
             Navigation.NavigateTo("/");
             return;
         }
 
+        canManage = CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator);
         authReady = true;
         await LoadLookups();
         await LoadRequests();

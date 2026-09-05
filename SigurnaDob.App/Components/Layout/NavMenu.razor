@@ -79,6 +79,13 @@
                     </MudNavLink>
                 }
 
+                @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver, AppRoles.FamilyMember))
+                {
+                    <MudNavLink Href="/calendar" Icon="@Icons.Material.Filled.CalendarMonth">
+                        Kalendar
+                    </MudNavLink>
+                }
+
                 @if (CurrentUser.HasAnyRole(AppRoles.Admin))
                 {
                     <MudNavLink Href="/users" Icon="@Icons.Material.Filled.ManageAccounts">

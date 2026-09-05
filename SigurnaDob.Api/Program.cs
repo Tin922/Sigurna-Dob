@@ -51,6 +51,7 @@ builder.Services.Configure<FileUploadOptions>(
 builder.Services.AddScoped<ResidentMediaStorageService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ChangeHistoryService>();
+builder.Services.AddScoped<CalendarService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

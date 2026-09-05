@@ -1,0 +1,303 @@
+@page "/calendar"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Kalendar</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Kalendar</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">
+        @if (showActivities)
+        {
+            <text>Pregled posjeta i aktivnosti po danima</text>
+        }
+        else
+        {
+            <text>Pregled vaših planiranih posjeta</text>
+        }
+    </MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 content-card calendar-panel" Elevation="0">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="PreviousMonth" />
+            <MudText Typo="Typo.h6" Class="page-title">@CurrentMonthLabel</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="NextMonth" />
+        </MudStack>
+
+        <div class="calendar-legend mb-3">
+            <MudChip T="string" Size="Size.Small" Class="calendar-chip visit">Posjet</MudChip>
+            @if (showActivities)
+            {
+                <MudChip T="string" Size="Size.Small" Class="calendar-chip activity">Aktivnost</MudChip>
+            }
+        </div>
+
+        <div class="calendar-grid">
+            @foreach (var dayName in DayNames)
+            {
+                <div class="calendar-weekday">@dayName</div>
+            }
+
+            @foreach (var cell in calendarCells)
+            {
+                <div class="calendar-day @(cell.IsCurrentMonth ? string.Empty : "outside") @(IsSelected(cell.Date) ? "selected" : string.Empty)"
+                     @onclick="@(() => SelectDay(cell.Date))">
+                    <div class="calendar-day-number">@cell.Date.Day</div>
+                    @foreach (var item in GetEventsForDay(cell.Date).Take(3))
+                    {
+                        <div class="calendar-event @GetEventCssClass(item)" title="@item.Title">
+                            @item.StartsAt.ToLocalTime().ToString("HH:mm") @GetShortTitle(item)
+                        </div>
+                    }
+                    @{
+                        var extraCount = GetEventsForDay(cell.Date).Count - 3;
+                    }
+                    @if (extraCount > 0)
+                    {
+                        <div class="calendar-more">+@extraCount</div>
+                    }
+                </div>
+            }
+        </div>
+    </MudPaper>
+
+    <MudPaper Class="pa-4 mt-4 content-card" Elevation="0">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">
+            @SelectedDayLabel
+        </MudText>
+
+        @if (selectedDayEvents.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="page-subtitle">Nema događaja za odabrani dan.</MudText>
+        }
+        else
+        {
+            <MudList T="CalendarEventDto" Dense="true">
+                @foreach (var item in selectedDayEvents)
+                {
+                    <MudListItem>
+                        <div class="calendar-day-detail">
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mb-1">
+                                <MudChip T="string"
+                                         Size="Size.Small"
+                                         Variant="Variant.Outlined"
+                                         Class="@GetEventCssClass(item)">
+                                    @(item.EventType == CalendarEventTypes.Visit ? "Posjet" : "Aktivnost")
+                                </MudChip>
+                                <MudText Typo="Typo.caption" Class="page-subtitle">@item.StatusName</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Class="calendar-event-title">@item.Title</MudText>
+                            @if (!string.IsNullOrWhiteSpace(item.Subtitle))
+                            {
+                                <MudText Typo="Typo.caption" Class="page-subtitle">@item.Subtitle</MudText>
+                            }
+                            <MudText Typo="Typo.caption" Class="page-subtitle">
+                                @FormatEventTime(item)
+                            </MudText>
+                            @if (!string.IsNullOrWhiteSpace(GetEventLink(item)))
+                            {
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Class="px-0 mt-1"
+                                           OnClick="@(() => OpenEvent(item))">
+                                    Otvori
+                                </MudButton>
+                            }
+                        </div>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        }
+    </MudPaper>
+}
+
+@code {
+    private static readonly string[] DayNames = ["Pon", "Uto", "Sri", "Čet", "Pet", "Sub", "Ned"];
+
+    private List<CalendarEventDto> events = new();
+    private List<CalendarCell> calendarCells = new();
+    private DateOnly currentMonth;
+    private DateOnly selectedDay;
+    private bool isLoading = true;
+    private bool showActivities;
+    private string? errorMessage;
+    private bool authReady;
+
+    private string CurrentMonthLabel =>
+        new DateTime(currentMonth.Year, currentMonth.Month, 1)
+            .ToString("MMMM yyyy", CroatianCulture);
+
+    private string SelectedDayLabel =>
+        selectedDay.ToString("dddd, dd.MM.yyyy", CroatianCulture);
+
+    private List<CalendarEventDto> selectedDayEvents =>
+        GetEventsForDay(selectedDay).OrderBy(item => item.StartsAt).ToList();
+
+    private static readonly System.Globalization.CultureInfo CroatianCulture =
+        System.Globalization.CultureInfo.GetCultureInfo("hr-HR");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        var canView = CurrentUser.HasAnyRole(
+            AppRoles.Admin,
+            AppRoles.Coordinator,
+            AppRoles.Caregiver,
+            AppRoles.FamilyMember);
+
+        if (!canView)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        showActivities = CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver);
+        currentMonth = DateOnly.FromDateTime(DateTime.Today);
+        selectedDay = DateOnly.FromDateTime(DateTime.Today);
+        authReady = true;
+        await LoadMonth();
+        StateHasChanged();
+    }
+
+    private async Task LoadMonth()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var monthStart = new DateTime(currentMonth.Year, currentMonth.Month, 1, 0, 0, 0, DateTimeKind.Local)
+                .ToUniversalTime();
+            var monthEndLocal = new DateTime(currentMonth.Year, currentMonth.Month, 1, 0, 0, 0, DateTimeKind.Local)
+                .AddMonths(1)
+                .AddTicks(-1);
+            var monthEnd = monthEndLocal.ToUniversalTime();
+
+            var url =
+                $"api/calendar?from={Uri.EscapeDataString(monthStart.ToString("o"))}&to={Uri.EscapeDataString(monthEnd.ToString("o"))}";
+
+            events = await Http.GetFromJsonAsync<List<CalendarEventDto>>(url) ?? new();
+            BuildCalendarCells();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Kalendar nije moguće učitati: {ex.Message}";
+            events = new();
+            BuildCalendarCells();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void BuildCalendarCells()
+    {
+        var firstOfMonth = new DateOnly(currentMonth.Year, currentMonth.Month, 1);
+        var offset = ((int)firstOfMonth.DayOfWeek + 6) % 7;
+        var gridStart = firstOfMonth.AddDays(-offset);
+
+        calendarCells = Enumerable.Range(0, 42)
+            .Select(index =>
+            {
+                var date = gridStart.AddDays(index);
+                return new CalendarCell(date, date.Month == currentMonth.Month);
+            })
+            .ToList();
+    }
+
+    private List<CalendarEventDto> GetEventsForDay(DateOnly day)
+    {
+        return events
+            .Where(item => DateOnly.FromDateTime(item.StartsAt.ToLocalTime()) == day)
+            .ToList();
+    }
+
+    private bool IsSelected(DateOnly day) => day == selectedDay;
+
+    private void SelectDay(DateOnly day)
+    {
+        selectedDay = day;
+    }
+
+    private async Task PreviousMonth()
+    {
+        currentMonth = currentMonth.AddMonths(-1);
+        selectedDay = new DateOnly(currentMonth.Year, currentMonth.Month, 1);
+        await LoadMonth();
+    }
+
+    private async Task NextMonth()
+    {
+        currentMonth = currentMonth.AddMonths(1);
+        selectedDay = new DateOnly(currentMonth.Year, currentMonth.Month, 1);
+        await LoadMonth();
+    }
+
+    private static string GetEventCssClass(CalendarEventDto item) =>
+        item.EventType == CalendarEventTypes.Visit ? "visit" : "activity";
+
+    private static string GetShortTitle(CalendarEventDto item)
+    {
+        if (item.EventType == CalendarEventTypes.Activity)
+            return item.Title.Length > 16 ? item.Title[..16] + "…" : item.Title;
+
+        var parts = item.Title.Split('—', 2);
+        return parts.Length == 2 ? parts[1].Trim() : item.Title;
+    }
+
+    private static string FormatEventTime(CalendarEventDto item)
+    {
+        var start = item.StartsAt.ToLocalTime().ToString("HH:mm");
+        if (item.EndsAt.HasValue)
+            return $"{start} – {item.EndsAt.Value.ToLocalTime():HH:mm}";
+
+        return start;
+    }
+
+    private string? GetEventLink(CalendarEventDto item)
+    {
+        if (item.EventType == CalendarEventTypes.Activity)
+            return showActivities ? $"/activities/edit/{item.Id}" : null;
+
+        return CurrentUser.HasAnyRole(AppRoles.FamilyMember) &&
+               !CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver)
+            ? "/my-visit-requests"
+            : "/visit-requests";
+    }
+
+    private void OpenEvent(CalendarEventDto item)
+    {
+        var link = GetEventLink(item);
+        if (!string.IsNullOrWhiteSpace(link))
+            Navigation.NavigateTo(link);
+    }
+
+    private sealed record CalendarCell(DateOnly Date, bool IsCurrentMonth);
+}

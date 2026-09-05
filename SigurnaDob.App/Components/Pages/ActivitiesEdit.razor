@@ -10,10 +10,10 @@
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 
-<PageTitle>Uredi aktivnost</PageTitle>
+<PageTitle>@(canManage ? "Uredi aktivnost" : "Pregled aktivnosti")</PageTitle>
 
 <div class="page-header">
-    <MudText Typo="Typo.h4" Class="page-title">Uredi aktivnost</MudText>
+    <MudText Typo="Typo.h4" Class="page-title">@(canManage ? "Uredi aktivnost" : "Pregled aktivnosti")</MudText>
     @if (!string.IsNullOrWhiteSpace(typeName))
     {
         <MudText Typo="Typo.body2" Class="page-subtitle">@typeName</MudText>
@@ -41,39 +41,43 @@ else
             <MudPaper Class="pa-4 content-card" Elevation="0">
                 <MudText Typo="Typo.h6" Class="mb-3">Osnovni podaci</MudText>
                 <MudStack Spacing="2">
-                    <MudTextField @bind-Value="model.Title" Label="Naslov" Required="true" Variant="Variant.Outlined" />
-                    <MudTextField @bind-Value="model.Description" Label="Opis" Lines="3" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="model.Title" Label="Naslov" Required="true" Variant="Variant.Outlined" ReadOnly="@(!canManage)" />
+                    <MudTextField @bind-Value="model.Description" Label="Opis" Lines="3" Variant="Variant.Outlined" ReadOnly="@(!canManage)" />
 
                     <MudSelect T="int"
                                Label="Vrsta aktivnosti"
                                @bind-Value="model.ActivityTypeId"
                                Variant="Variant.Outlined"
-                               Required="true">
+                               Required="true"
+                               Disabled="@(!canManage)">
                         @foreach (var type in types)
                         {
                             <MudSelectItem Value="@type.Id">@type.Name</MudSelectItem>
                         }
                     </MudSelect>
 
-                    <MudTextField @bind-Value="model.Location" Label="Lokacija" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="model.Location" Label="Lokacija" Variant="Variant.Outlined" ReadOnly="@(!canManage)" />
 
-                    <MudDatePicker @bind-Date="startDate" Label="Početak (datum)" Variant="Variant.Outlined" />
-                    <MudTimePicker @bind-Time="startTime" Label="Početak (vrijeme)" Variant="Variant.Outlined" />
+                    <MudDatePicker @bind-Date="startDate" Label="Početak (datum)" Variant="Variant.Outlined" ReadOnly="@(!canManage)" />
+                    <MudTimePicker @bind-Time="startTime" Label="Početak (vrijeme)" Variant="Variant.Outlined" ReadOnly="@(!canManage)" />
 
-                    <MudDatePicker @bind-Date="endDate" Label="Završetak (datum)" Variant="Variant.Outlined" Clearable="true" />
-                    <MudTimePicker @bind-Time="endTime" Label="Završetak (vrijeme)" Variant="Variant.Outlined" Clearable="true" />
+                    <MudDatePicker @bind-Date="endDate" Label="Završetak (datum)" Variant="Variant.Outlined" Clearable="true" ReadOnly="@(!canManage)" />
+                    <MudTimePicker @bind-Time="endTime" Label="Završetak (vrijeme)" Variant="Variant.Outlined" Clearable="true" ReadOnly="@(!canManage)" />
 
                     <MudStack Row="true" Spacing="2" Class="pt-2">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
-                            @(isSaving ? "Spremanje..." : "Spremi promjene")
-                        </MudButton>
+                        @if (canManage)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="isSaving">
+                                @(isSaving ? "Spremanje..." : "Spremi promjene")
+                            </MudButton>
+                            <MudButton Variant="Variant.Text"
+                                       Color="Color.Error"
+                                       OnClick="DeleteActivity"
+                                       Disabled="isSaving">
+                                Obriši
+                            </MudButton>
+                        }
                         <MudButton Variant="Variant.Outlined" Href="/activities">Natrag</MudButton>
-                        <MudButton Variant="Variant.Text"
-                                   Color="Color.Error"
-                                   OnClick="DeleteActivity"
-                                   Disabled="isSaving">
-                            Obriši
-                        </MudButton>
                     </MudStack>
                 </MudStack>
             </MudPaper>
@@ -83,25 +87,28 @@ else
             <MudPaper Class="pa-4 content-card" Elevation="0">
                 <MudText Typo="Typo.h6" Class="mb-3">Sudionici (@participants.Count)</MudText>
 
-                <MudStack Row="true" Spacing="2" Class="mb-4">
-                    <MudSelect T="int?"
-                               Label="Dodaj korisnika"
-                               @bind-Value="selectedResidentId"
-                               Variant="Variant.Outlined"
-                               Style="min-width: 220px"
-                               Clearable="true">
-                        @foreach (var resident in availableResidents)
-                        {
-                            <MudSelectItem T="int?" Value="@((int?)resident.Id)">@resident.Name</MudSelectItem>
-                        }
-                    </MudSelect>
-                    <MudButton Variant="Variant.Filled"
-                               Color="Color.Secondary"
-                               OnClick="EnrollParticipant"
-                               Disabled="@(!selectedResidentId.HasValue || isEnrolling)">
-                        Dodaj
-                    </MudButton>
-                </MudStack>
+                @if (canManage)
+                {
+                    <MudStack Row="true" Spacing="2" Class="mb-4">
+                        <MudSelect T="int?"
+                                   Label="Dodaj korisnika"
+                                   @bind-Value="selectedResidentId"
+                                   Variant="Variant.Outlined"
+                                   Style="min-width: 220px"
+                                   Clearable="true">
+                            @foreach (var resident in availableResidents)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)resident.Id)">@resident.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Secondary"
+                                   OnClick="EnrollParticipant"
+                                   Disabled="@(!selectedResidentId.HasValue || isEnrolling)">
+                            Dodaj
+                        </MudButton>
+                    </MudStack>
+                }
 
                 <MudTable Items="participants" Dense="true" Hover="true" Elevation="0">
                     <HeaderContent>
@@ -119,13 +126,20 @@ else
                         </MudTd>
                         <MudTd>@context.EnrolledAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
                         <MudTd>
-                            <MudButton Variant="Variant.Text"
-                                       Color="Color.Error"
-                                       Size="Size.Small"
-                                       OnClick="@(() => RemoveParticipant(context.ResidentId))"
-                                       Disabled="@(busyResidentId == context.ResidentId)">
-                                Ukloni
-                            </MudButton>
+                            @if (canManage)
+                            {
+                                <MudButton Variant="Variant.Text"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           OnClick="@(() => RemoveParticipant(context.ResidentId))"
+                                           Disabled="@(busyResidentId == context.ResidentId)">
+                                    Ukloni
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.caption">—</MudText>
+                            }
                         </MudTd>
                     </RowTemplate>
                     <NoRecordsContent>
@@ -154,6 +168,7 @@ else
     private bool isLoading = true;
     private bool isSaving;
     private bool isEnrolling;
+    private bool canManage;
     private string? errorMessage;
     private string? successMessage;
     private bool authReady;
@@ -169,12 +184,13 @@ else
         if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
             return;
 
-        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
         {
-            Navigation.NavigateTo("/activities");
+            Navigation.NavigateTo("/");
             return;
         }
 
+        canManage = CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator);
         authReady = true;
         types = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/activity-types") ?? new();
         residents = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/residents") ?? new();

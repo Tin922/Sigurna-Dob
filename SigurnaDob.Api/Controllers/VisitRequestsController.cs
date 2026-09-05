@@ -23,7 +23,7 @@ public class VisitRequestsController : ControllerBase
         _context = context;
     }
 
-    [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
+    [Authorize(Policy = AuthorizationPolicies.Staff)]
     [HttpGet]
     public async Task<ActionResult<List<VisitRequestDto>>> GetVisitRequests(
         [FromQuery] string? search,

@@ -17,13 +17,16 @@
     <MudText Typo="Typo.body2" Class="page-subtitle">Organizacija zajedničkih aktivnosti i sudionika</MudText>
 </div>
 
-<MudButton Variant="Variant.Filled"
-           Color="Color.Primary"
-           Href="/activities/create"
-           Class="mb-4"
-           StartIcon="@Icons.Material.Filled.Add">
-    Nova aktivnost
-</MudButton>
+@if (canManage)
+{
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               Href="/activities/create"
+               Class="mb-4"
+               StartIcon="@Icons.Material.Filled.Add">
+        Nova aktivnost
+    </MudButton>
+}
 
 <MudPaper Class="pa-4 filter-panel" Elevation="0">
     <MudGrid>
@@ -78,11 +81,13 @@ else
         </HeaderContent>
         <RowTemplate>
             <MudTd>
-                @context.Title
-                @if (!string.IsNullOrWhiteSpace(context.Description))
-                {
-                    <MudText Typo="Typo.caption" Class="page-subtitle">@context.Description</MudText>
-                }
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.body2">@context.Title</MudText>
+                    @if (!string.IsNullOrWhiteSpace(context.Description))
+                    {
+                        <MudText Typo="Typo.caption" Class="page-subtitle mt-1">@context.Description</MudText>
+                    }
+                </MudStack>
             </MudTd>
             <MudTd>@context.TypeName</MudTd>
             <MudTd>@context.StartsAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
@@ -92,7 +97,7 @@ else
                 <MudButton Variant="Variant.Text"
                            Color="Color.Primary"
                            Href="@($"/activities/edit/{context.Id}")">
-                    Uredi
+                    @(canManage ? "Uredi" : "Pregled")
                 </MudButton>
             </MudTd>
         </RowTemplate>
@@ -108,6 +113,7 @@ else
     private string? search;
     private int? typeId;
     private bool isLoading = true;
+    private bool canManage;
     private string? errorMessage;
     private bool authReady;
 
@@ -119,12 +125,13 @@ else
         if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
             return;
 
-        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
         {
             Navigation.NavigateTo("/");
             return;
         }
 
+        canManage = CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator);
         authReady = true;
         types = await Http.GetFromJsonAsync<List<LookupDto>>("api/lookups/activity-types") ?? new();
         await LoadActivities();

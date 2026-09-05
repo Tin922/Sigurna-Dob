@@ -11,7 +11,7 @@ using SigurnaDob.Shared.Models;
 
 namespace SigurnaDob.Api.Controllers;
 
-[Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
+[Authorize(Policy = AuthorizationPolicies.Staff)]
 [ApiController]
 [Route("api/[controller]")]
 public class ActivitiesController : ControllerBase
@@ -70,6 +70,7 @@ public class ActivitiesController : ControllerBase
         return Ok(ToDetailDto(activity));
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
     [HttpPost]
     public async Task<ActionResult<ActivityDetailDto>> CreateActivity(SaveActivityDto dto)
     {
@@ -103,6 +104,7 @@ public class ActivitiesController : ControllerBase
             await LoadDetailDto(activity.Id));
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ActivityDetailDto>> UpdateActivity(int id, SaveActivityDto dto)
     {
@@ -126,6 +128,7 @@ public class ActivitiesController : ControllerBase
         return Ok(await LoadDetailDto(id));
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteActivity(int id)
     {
@@ -138,6 +141,7 @@ public class ActivitiesController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
     [HttpPost("{id:int}/participants")]
     public async Task<ActionResult<ActivityDetailDto>> EnrollParticipant(
         int id,
@@ -169,6 +173,7 @@ public class ActivitiesController : ControllerBase
         return Ok(await LoadDetailDto(id));
     }
 
+    [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
     [HttpDelete("{id:int}/participants/{residentId:int}")]
     public async Task<ActionResult<ActivityDetailDto>> RemoveParticipant(int id, int residentId)
     {
