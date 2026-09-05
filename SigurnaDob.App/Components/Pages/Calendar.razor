@@ -51,32 +51,34 @@ else
             }
         </div>
 
-        <div class="calendar-grid">
-            @foreach (var dayName in DayNames)
-            {
-                <div class="calendar-weekday">@dayName</div>
-            }
+        <div class="calendar-scroll">
+            <div class="calendar-grid">
+                @foreach (var dayName in DayNames)
+                {
+                    <div class="calendar-weekday">@dayName</div>
+                }
 
-            @foreach (var cell in calendarCells)
-            {
-                <div class="calendar-day @(cell.IsCurrentMonth ? string.Empty : "outside") @(IsSelected(cell.Date) ? "selected" : string.Empty)"
-                     @onclick="@(() => SelectDay(cell.Date))">
-                    <div class="calendar-day-number">@cell.Date.Day</div>
-                    @foreach (var item in GetEventsForDay(cell.Date).Take(3))
-                    {
-                        <div class="calendar-event @GetEventCssClass(item)" title="@item.Title">
-                            @item.StartsAt.ToLocalTime().ToString("HH:mm") @GetShortTitle(item)
-                        </div>
-                    }
-                    @{
-                        var extraCount = GetEventsForDay(cell.Date).Count - 3;
-                    }
-                    @if (extraCount > 0)
-                    {
-                        <div class="calendar-more">+@extraCount</div>
-                    }
-                </div>
-            }
+                @foreach (var cell in calendarCells)
+                {
+                    <div class="calendar-day @(cell.IsCurrentMonth ? string.Empty : "outside") @(IsSelected(cell.Date) ? "selected" : string.Empty)"
+                         @onclick="@(() => SelectDay(cell.Date))">
+                        <div class="calendar-day-number">@cell.Date.Day</div>
+                        @foreach (var item in GetEventsForDay(cell.Date).Take(3))
+                        {
+                            <div class="calendar-event @GetEventCssClass(item)" title="@item.Title">
+                                @item.StartsAt.ToLocalTime().ToString("HH:mm") @GetShortTitle(item)
+                            </div>
+                        }
+                        @{
+                            var extraCount = GetEventsForDay(cell.Date).Count - 3;
+                        }
+                        @if (extraCount > 0)
+                        {
+                            <div class="calendar-more">+@extraCount</div>
+                        }
+                    </div>
+                }
+            </div>
         </div>
     </MudPaper>
 

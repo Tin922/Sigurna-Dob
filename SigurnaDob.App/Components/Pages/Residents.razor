@@ -62,7 +62,7 @@
                 }
             </MudSelect>
         </MudItem>
-        <MudItem xs="12" md="2" Class="d-flex align-center gap-2">
+        <MudItem xs="12" md="2" Class="filter-actions d-flex align-center gap-2">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadResidents">
                 Primijeni
             </MudButton>
@@ -84,7 +84,7 @@
 }
 else
 {
-    <MudTable Items="residents" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+    <MudTable Items="residents" Hover="true" Dense="true" Breakpoint="Breakpoint.None" Class="content-card mt-4" Elevation="0">
         <HeaderContent>
             <MudTh>Ime</MudTh>
             <MudTh>Prezime</MudTh>

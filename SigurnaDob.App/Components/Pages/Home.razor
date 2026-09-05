@@ -135,20 +135,25 @@ else
                             </div>
                             <MudText Typo="Typo.h4" Class="dashboard-stat-value">@dashboard.Personal.MyOpenCareTasks</MudText>
                             <MudText Typo="Typo.caption" Class="dashboard-stat-label">Moji otvoreni zadaci</MudText>
-                            <MudButton Href="/my-care-tasks"
-                                       Variant="Variant.Text"
-                                       Color="Color.Primary"
-                                       Size="Size.Small"
-                                       Class="mt-2 px-0">
-                                Otvori zadatke
-                            </MudButton>
-                            <MudButton Href="/caregiver-workload"
-                                       Variant="Variant.Text"
-                                       Color="Color.Primary"
-                                       Size="Size.Small"
-                                       Class="px-0">
-                                Moje opterećenje
-                            </MudButton>
+                            <MudStack Spacing="0" Class="dashboard-card-actions">
+                                <MudButton Href="/my-care-tasks"
+                                           Variant="Variant.Text"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Class="px-0">
+                                    Otvori zadatke
+                                </MudButton>
+                                @if (CurrentUser.HasRole(AppRoles.Caregiver))
+                                {
+                                    <MudButton Href="/caregiver-workload"
+                                               Variant="Variant.Text"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               Class="px-0">
+                                        Moje opterećenje
+                                    </MudButton>
+                                }
+                            </MudStack>
                         </MudPaper>
                     </MudItem>
                 }
@@ -228,7 +233,7 @@ else
                         <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
                             Kapacitet, popunjenost i status soba u domu.
                         </MudText>
-                        <MudStack Row="true" Spacing="2">
+                        <MudStack Row="true" Spacing="2" Class="quick-link-actions">
                             <MudButton Href="/rooms" Variant="Variant.Filled" Color="Color.Secondary">
                                 Sobe
                             </MudButton>

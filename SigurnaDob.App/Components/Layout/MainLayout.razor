@@ -1,14 +1,28 @@
 ﻿@inherits LayoutComponentBase
+@using SigurnaDob.App.Services
 @using SigurnaDob.App.Theme
+@implements IDisposable
+@inject LayoutNavigationService LayoutNavigation
+@inject IBrowserViewportService Viewport
 
 <MudThemeProvider Theme="SigurnaDobTheme.Theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
+<a href="#main-content" class="skip-link">Preskoči na sadržaj</a>
+
 <MudLayout Class="sigurna-layout">
     <MudAppBar Elevation="0" Class="sigurna-appbar" Dense="true">
-        <MudIcon Icon="@Icons.Material.Outlined.ElderlyWoman" Class="sigurna-appbar-logo mr-2" />
+        <span class="sigurna-menu-button-wrap">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                           Class="sigurna-menu-button"
+                           Color="Color.Primary"
+                           Edge="Edge.Start"
+                           aria-label="Otvori izbornik"
+                           OnClick="DrawerToggle" />
+        </span>
+        <MudIcon Icon="@Icons.Material.Outlined.ElderlyWoman" Class="sigurna-appbar-logo mr-2" aria-hidden="true" />
         <MudText Typo="Typo.h6" Class="sigurna-appbar-title">Sigurna dob</MudText>
         <MudSpacer />
         <MudText Typo="Typo.caption" Class="sigurna-appbar-subtitle d-none d-sm-block">
@@ -16,17 +30,66 @@
         </MudText>
     </MudAppBar>
 
-    <MudDrawer Open="true"
+    <MudDrawer @bind-Open="_drawerOpen"
                Elevation="0"
                Variant="DrawerVariant.Responsive"
+               Breakpoint="Breakpoint.Md"
                ClipMode="DrawerClipMode.Always"
                Class="sigurna-drawer">
         <NavMenu />
     </MudDrawer>
 
-    <MudMainContent Class="sigurna-main">
+    <MudMainContent Class="sigurna-main" id="main-content" tabindex="-1">
         <div class="sigurna-content">
             @Body
         </div>
     </MudMainContent>
 </MudLayout>
+
+@code {
+    private bool _drawerOpen;
+    private bool _viewportReady;
+    private readonly Guid _viewportId = Guid.NewGuid();
+
+    protected override void OnInitialized()
+    {
+        LayoutNavigation.DrawerCloseRequested += OnDrawerCloseRequested;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _viewportReady)
+            return;
+
+        _viewportReady = true;
+        await Viewport.SubscribeAsync(_viewportId, OnViewportChanged, fireImmediately: true);
+    }
+
+    private async Task OnViewportChanged(BrowserViewportEventArgs args)
+    {
+        _drawerOpen = args.Breakpoint >= Breakpoint.Md;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void DrawerToggle() => _drawerOpen = !_drawerOpen;
+
+    private void OnDrawerCloseRequested()
+    {
+        _ = CloseDrawerIfMobileAsync();
+    }
+
+    private async Task CloseDrawerIfMobileAsync()
+    {
+        if (await Viewport.IsMediaQueryMatchAsync("(min-width: 960px)"))
+            return;
+
+        _drawerOpen = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        LayoutNavigation.DrawerCloseRequested -= OnDrawerCloseRequested;
+        _ = Viewport.UnsubscribeAsync(_viewportId);
+    }
+}

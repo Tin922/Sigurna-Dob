@@ -50,7 +50,7 @@
                 }
             </MudSelect>
         </MudItem>
-        <MudItem xs="12" md="2" Class="d-flex align-center gap-2">
+        <MudItem xs="12" md="2" Class="filter-actions d-flex align-center gap-2">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadRequests">
                 Primijeni
             </MudButton>
@@ -77,7 +77,7 @@
 }
 else
 {
-    <MudTable Items="requests" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+    <MudTable Items="requests" Hover="true" Dense="true" Breakpoint="Breakpoint.None" Class="content-card mt-4" Elevation="0">
         <HeaderContent>
             <MudTh>Korisnik</MudTh>
             <MudTh>Obiteljski kontakt</MudTh>

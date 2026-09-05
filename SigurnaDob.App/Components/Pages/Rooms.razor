@@ -48,7 +48,7 @@
                 }
             </MudSelect>
         </MudItem>
-        <MudItem xs="12" md="4" Class="d-flex align-center gap-2">
+        <MudItem xs="12" md="4" Class="filter-actions d-flex align-center gap-2">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadRooms">
                 Primijeni
             </MudButton>
@@ -70,7 +70,7 @@
 }
 else
 {
-    <MudTable Items="rooms" Hover="true" Dense="true" Class="content-card mt-4" Elevation="0">
+    <MudTable Items="rooms" Hover="true" Dense="true" Breakpoint="Breakpoint.None" Class="content-card mt-4" Elevation="0">
         <HeaderContent>
             <MudTh>Naziv</MudTh>
             <MudTh>Status</MudTh>

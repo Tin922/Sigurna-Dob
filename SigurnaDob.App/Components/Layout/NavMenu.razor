@@ -2,6 +2,7 @@
 @using SigurnaDob.Shared.Constants
 @inject CurrentUserService CurrentUser
 @inject NavigationManager Navigation
+@inject LayoutNavigationService LayoutNavigation
 @implements IDisposable
 
 <div class="nav-menu-root">
@@ -123,6 +124,7 @@
     protected override void OnInitialized()
     {
         CurrentUser.UserChanged += HandleUserChanged;
+        Navigation.LocationChanged += HandleLocationChanged;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -138,6 +140,11 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        LayoutNavigation.RequestDrawerClose();
+    }
+
     private async Task HandleLogout()
     {
         await CurrentUser.LogoutAsync();
@@ -147,5 +154,6 @@
     public void Dispose()
     {
         CurrentUser.UserChanged -= HandleUserChanged;
+        Navigation.LocationChanged -= HandleLocationChanged;
     }
 }

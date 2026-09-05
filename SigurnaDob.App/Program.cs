@@ -14,6 +14,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices();
 builder.Services.AddScoped<ProtectedLocalStorage>();
 builder.Services.AddScoped<CurrentUserService>();
+builder.Services.AddScoped<LayoutNavigationService>();
 
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7210/";
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });

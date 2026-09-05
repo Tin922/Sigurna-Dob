@@ -64,3 +64,11 @@
 .nav-menu-root ::deep .mud-divider {
     border-color: rgba(255, 255, 255, 0.1) !important;
 }
+
+@media (max-width: 960px) {
+    .nav-menu-root ::deep .mud-nav-link {
+        min-height: 48px;
+        padding-top: 0.65rem;
+        padding-bottom: 0.65rem;
+    }
+}
