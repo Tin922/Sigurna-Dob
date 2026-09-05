@@ -1,19 +1,19 @@
-// Sigurna dob — model baze (finalni projekt)
-// Usklađeno s Instrucitons.md (Lekcija 9)
+// Sigurna dob — database model (final project)
+// Aligned with EF Core migrations and application implementation
 // DBML: https://dbml.dbdiagram.io/docs
 //
-// Poslovna pravila u APP-u (ne u bazi):
-// - U pripremi za prijem: soba nije obavezna
-// - Aktivan: mora imati sobu
-// - Privremeno odsutan: može zadržati sobu (računa se u popunjenost)
-// - Premješten / Arhiviran: nema aktivni smještaj
-// - Popunjenost sobe = izračun iz kapaciteta i dodjela, ne polje u bazi
-// - Korisnik doma (Resident) nema AppUser račun
-// - AppUser može imati 0 ili 1 poslovni profil: Employee ILI FamilyContact (ne oba)
-// - Admin može postojati samo kao AppUser + uloga, bez employee_id i family_contact_id
-// - Korisnik s poviješću se arhivira, ne briše fizički
+// Business rules enforced in the APP (not in the database):
+// - Admission pending: room is optional
+// - Active: must have an assigned room
+// - Temporarily absent: may keep a room (counts toward occupancy)
+// - Moved out / Archived: no active room assignment
+// - Room occupancy = calculated from capacity and assignments, not a stored field
+// - A resident does not have an AppUser account
+// - AppUser may have 0 or 1 business profile: Employee OR FamilyContact (not both)
+// - Admin may exist only as AppUser + role, without employee_id or family_contact_id
+// - Records with history are archived, not physically deleted
 
-// ─── Lookup tablice (seed obavezno) ───────────────────────────────
+// ─── Lookup tables (seed required) ─────────────────────────────────
 
 Table resident_statuses {
   id integer [primary key, increment]
@@ -63,14 +63,14 @@ Table activity_types {
   note varchar(255)
 }
 
-// Seed resident_statuses: U pripremi za prijem, Aktivan, Privremeno odsutan, Premješten iz doma, Arhiviran
-// Seed room_statuses: U uporabi, Održavanje, Izvan uporabe
-// Seed care_task_types: Terapija, Prehrana, Higijena, Pratnja, Administrativno
-// Seed care_task_statuses: Novo, Dodijeljeno, U tijeku, Izvršeno, Otkazano
-// Seed visit_request_statuses: Zaprimljeno, Odobreno, Odbijeno, Održano, Otkazano
-// Seed activity_types: Društvena, Kreativna, Tjelovježba, Edukativna, Izlet
-// Seed employee_positions: Koordinator, Njegovatelj
-// Seed employee_statuses: Aktivan, Neaktivan
+// Seed resident_statuses: admission pending, active, temporarily absent, moved out, archived
+// Seed room_statuses: in use, maintenance, out of service
+// Seed care_task_types: therapy, nutrition, hygiene, escort, administrative
+// Seed care_task_statuses: new, assigned, in progress, completed, cancelled
+// Seed visit_request_statuses: received, approved, rejected, held, cancelled
+// Seed activity_types: social, creative, exercise, educational, outing
+// Seed employee_positions: coordinator, caregiver
+// Seed employee_statuses: active, inactive
 
 // ─── Auth ───────────────────────────────────────────────────────────
 
@@ -91,13 +91,13 @@ Table app_users {
   created_at datetime [not null, default: `now()`]
 }
 
-// employee_id i family_contact_id su NULLABLE — profil nije obavezan
-// Primjeri:
-//   Admin bez profila:     employee_id=null, family_contact_id=null, uloga Admin
-//   Koordinator:         employee_id=1,    family_contact_id=null, uloga Coordinator
-//   Njegovatelj:         employee_id=2,    family_contact_id=null, uloga Caregiver
-//   Član obitelji:       employee_id=null, family_contact_id=3,    uloga FamilyMember
-// App validacija: ne smiju biti popunjena oba FK-a istovremeno
+// employee_id and family_contact_id are nullable — a profile is optional
+// Examples:
+//   Admin without profile: employee_id=null, family_contact_id=null, role Admin
+//   Coordinator:           employee_id=1,    family_contact_id=null, role Coordinator
+//   Caregiver:             employee_id=2,    family_contact_id=null, role Caregiver
+//   Family member:         employee_id=null, family_contact_id=3,    role FamilyMember
+// App validation: both FKs must not be set at the same time
 
 Table app_user_roles {
   app_user_id integer [not null]
@@ -109,10 +109,10 @@ Table app_user_roles {
 }
 
 // Seed app_roles: User, Admin, Coordinator, Caregiver, FamilyMember
-// Admin = uloga, ne zasebna tablica
-// Resident nema AppUser
+// Admin is a role, not a separate table
+// Residents do not have AppUser accounts
 
-// ─── Poslovni profili ───────────────────────────────────────────────
+// ─── Business profiles ──────────────────────────────────────────────
 
 Table employees {
   id integer [primary key, increment]
@@ -159,7 +159,7 @@ Table family_contacts {
   note varchar(500)
 }
 
-// ─── Zadaci skrbi ───────────────────────────────────────────────────
+// ─── Care tasks ─────────────────────────────────────────────────────
 
 Table care_tasks {
   id integer [primary key, increment]
@@ -178,11 +178,45 @@ Table care_tasks {
   updated_at datetime [not null, default: `now()`]
 }
 
-// caregiver_id null = slobodan zadatak prije dodjele njegovatelju
-// Izvršeno zahtijeva completed_at + completion_note (app validacija)
-// Povijest: zapis ostaje u tablici, ne fizički DELETE
+// caregiver_id null = unassigned task before caregiver assignment
+// Completed requires completed_at + completion_note (app validation)
+// History rows remain in the table; no physical DELETE
 
-// ─── Posjeti ────────────────────────────────────────────────────────
+// ─── Change history (AddChangeHistory migration) ────────────────────
+
+Table resident_status_histories {
+  id integer [primary key, increment]
+  resident_id integer [not null]
+  from_status_id integer [null]
+  to_status_id integer [not null]
+  changed_at datetime [not null, default: `now()`]
+  changed_by_app_user_id integer [null]
+  changed_by_name varchar(200) [not null]
+}
+
+// Records resident status changes (e.g. admission pending → active)
+// changed_by_app_user_id is audit metadata without a required FK to app_users
+
+Table care_task_change_histories {
+  id integer [primary key, increment]
+  care_task_id integer [not null]
+  change_type varchar(50) [not null]
+  from_status_id integer [null]
+  to_status_id integer [null]
+  from_caregiver_id integer [null]
+  to_caregiver_id integer [null]
+  changed_at datetime [not null, default: `now()`]
+  changed_by_app_user_id integer [null]
+  changed_by_name varchar(200) [not null]
+}
+
+// change_type: Status | Assignment
+// Records care task status changes or caregiver reassignments
+
+// Note: calendar, room occupancy, caregiver workload, and AI features
+// reuse existing tables — no additional migrations beyond AddChangeHistory.
+
+// ─── Visits ─────────────────────────────────────────────────────────
 
 Table visit_requests {
   id integer [primary key, increment]
@@ -198,9 +232,9 @@ Table visit_requests {
   updated_at datetime [not null, default: `now()`]
 }
 
-// FamilyMember (AppUser) šalje zahtjev; Coordinator odobrava/odbija/evidentira održano
+// FamilyMember (AppUser) submits the request; Coordinator approves/rejects/records held visit
 
-// ─── Aktivnosti (N:M) ───────────────────────────────────────────────
+// ─── Activities (N:M) ───────────────────────────────────────────────
 
 Table activities {
   id integer [primary key, increment]
@@ -225,7 +259,7 @@ Table resident_activities {
   }
 }
 
-// ─── Dokumenti i slike uz profil korisnika doma ─────────────────────
+// ─── Documents and images on resident profile ───────────────────────
 
 Table resident_media {
   id integer [primary key, increment]
@@ -242,9 +276,9 @@ Table resident_media {
 
 // media_type: Document | Image
 // content_type: application/pdf, image/jpeg, image/png, ...
-// Upload: sigurno generirano stored_file_name + metapodaci u bazi
+// Upload: securely generated stored_file_name + metadata in the database
 
-// ─── Reference (FK > PK) ────────────────────────────────────────────
+// ─── References (FK > PK) ───────────────────────────────────────────
 
 Ref: employees.employee_position_id > employee_positions.id
 Ref: employees.employee_status_id > employee_statuses.id
@@ -267,6 +301,16 @@ Ref: care_tasks.care_task_type_id > care_task_types.id
 Ref: care_tasks.care_task_status_id > care_task_statuses.id
 Ref: care_tasks.coordinator_id > employees.id
 Ref: care_tasks.caregiver_id > employees.id
+
+Ref: resident_status_histories.resident_id > residents.id
+Ref: resident_status_histories.from_status_id > resident_statuses.id
+Ref: resident_status_histories.to_status_id > resident_statuses.id
+
+Ref: care_task_change_histories.care_task_id > care_tasks.id
+Ref: care_task_change_histories.from_status_id > care_task_statuses.id
+Ref: care_task_change_histories.to_status_id > care_task_statuses.id
+Ref: care_task_change_histories.from_caregiver_id > employees.id
+Ref: care_task_change_histories.to_caregiver_id > employees.id
 
 Ref: visit_requests.resident_id > residents.id
 Ref: visit_requests.family_contact_id > family_contacts.id

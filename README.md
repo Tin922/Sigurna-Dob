@@ -1,27 +1,27 @@
-# Sigurna dob — finalni projekt
+# Sigurna dob — final project
 
-Blazor Server aplikacija za upravljanje domom za starije osobe: korisnici, sobe, zadaci skrbi, posjeti, aktivnosti, korisnički računi i nadzorna ploča.
+Blazor Server application for managing a nursing home: residents, rooms, care tasks, visits, activities, user accounts, and a dashboard.
 
 **Stack:** .NET 10, EF Core (SQLite), JWT, MudBlazor, Swagger
 
 ---
 
-## Struktura rješenja
+## Solution structure
 
 ```
 SigurnaDob.slnx
-├── SigurnaDob.Api      — REST API, autentifikacija, migracije
+├── SigurnaDob.Api      — REST API, authentication, migrations
 ├── SigurnaDob.App      — Blazor Server UI (MudBlazor)
-└── SigurnaDob.Shared   — modeli, DTO-ovi, konstante
+└── SigurnaDob.Shared   — models, DTOs, constants
 ```
 
 ---
 
-## Preduvjeti
+## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- (Preporučeno) JetBrains Rider ili Visual Studio 2022
-- EF alat (jednom po stroju):
+- (Recommended) JetBrains Rider or Visual Studio 2022
+- EF tools (once per machine):
 
 ```bash
 dotnet tool restore
@@ -29,13 +29,13 @@ dotnet tool restore
 
 ---
 
-## Pokretanje
+## Running the application
 
 ### Rider
 
-1. Otvori `SigurnaDob.slnx`
-2. Pokreni **Multi-Launch** ili oba projekta s profilom **https**
-3. Otvori Blazor aplikaciju: `https://localhost:7096`
+1. Open `SigurnaDob.slnx`
+2. Run **Multi-Launch** or both projects with the **https** profile
+3. Open the Blazor app: `https://localhost:7096`
 4. Swagger (API): `https://localhost:7210/swagger`
 
 ### CLI
@@ -50,70 +50,70 @@ cd SigurnaDob.App
 dotnet run --launch-profile https
 ```
 
-| Servis | HTTPS | HTTP |
-|--------|-------|------|
+| Service | HTTPS | HTTP |
+|---------|-------|------|
 | **API** | `7210` | `5088` |
 | **App** | `7096` | `5064` |
 
-Pri prvom pokretanju API automatski primjenjuje migracije i seed podatke (`DemoDataSeeder`, `AppUserSeeder`).
+On first startup, the API automatically applies migrations and seeds demo data (`DemoDataSeeder`, `AppUserSeeder`).
 
 ---
 
-## Demo korisnici
+## Demo users
 
-| Uloga | Email | Lozinka |
-|-------|-------|---------|
+| Role | Email | Password |
+|------|-------|----------|
 | Admin | `admin@sigurna-dob.local` | `Admin123!` |
-| Koordinator | `coordinator@sigurna-dob.local` | `Coordinator123!` |
-| Njegovatelj | `caregiver@sigurna-dob.local` | `Caregiver123!` |
-| Član obitelji | `family@sigurna-dob.local` | `Family123!` |
+| Coordinator | `coordinator@sigurna-dob.local` | `Coordinator123!` |
+| Caregiver | `caregiver@sigurna-dob.local` | `Caregiver123!` |
+| Family member | `family@sigurna-dob.local` | `Family123!` |
 
-Login u aplikaciji: `/login`  
-Login u Swaggeru: `POST /api/auth/login` → kopiraj `accessToken` u **Authorize**.
-
----
-
-## Moduli
-
-| Modul | API | Blazor stranice | Tko vidi / uređuje |
-|-------|-----|-----------------|---------------------|
-| Autentifikacija | `AuthController` | `/login` | Svi (login); `/api/auth/me` za prijavljenog |
-| Korisnici doma | `ResidentsController` | `/residents`, profil, create/edit | Staff pregled; koordinator/admin uređuje |
-| Sobe | `RoomsController` | `/rooms`, create/edit | Staff pregled; koordinator/admin uređuje |
-| Obiteljski kontakti | `FamilyContactsController` | create/edit s profila korisnika | Staff pregled; koordinator/admin uređuje |
-| Zadaci skrbi | `CareTasksController` | `/care-tasks`, `/my-care-tasks` | Staff/koordinator upravlja; njegovatelj vidi svoje |
-| Zahtjevi za posjet | `VisitRequestsController` | `/visit-requests`, `/my-visit-requests` | Koordinator odlučuje; obitelj šalje svoje |
-| Aktivnosti | `ActivitiesController` | `/activities`, create/edit | Koordinator/admin |
-| Korisnički računi | `UsersController` | `/users`, create/edit | Samo admin |
-| Mediji korisnika | `ResidentMediaController` | upload na profilu | Staff pregled; koordinator/admin upload/brisanje |
-| Nadzorna ploča | `DashboardController` | `/` (Home) | Operativno: admin/koordinator; osobno: njegovatelj/obitelj |
-| Kalendar | `CalendarController` | `/calendar` | Staff i obitelj (obitelj vidi svoje posjete) |
-| Popunjenost soba | `RoomsController` | `/room-occupancy` | Staff |
-| Opterećenje njegovatelja | `CareTasksController` | `/caregiver-workload` | Koordinator/admin (svi); njegovatelj (svoje) |
-| AI pomoćnik | `AiController` | `/` (sažetak), `/care-tasks/create` (prijedlog) | Koordinator/admin |
-| Lookups | `LookupsController` | — (koriste forme) | Staff |
+Login in the app: `/login`  
+Login in Swagger: `POST /api/auth/login` → copy `accessToken` into **Authorize**.
 
 ---
 
-## Autorizacijska pravila (sažetak)
+## Modules
+
+| Module | API | Blazor pages | Who can view / edit |
+|--------|-----|--------------|---------------------|
+| Authentication | `AuthController` | `/login` | Everyone (login); `/api/auth/me` for signed-in user |
+| Residents | `ResidentsController` | `/residents`, profile, create/edit | Staff view; coordinator/admin edit |
+| Rooms | `RoomsController` | `/rooms`, create/edit | Staff view; coordinator/admin edit |
+| Family contacts | `FamilyContactsController` | create/edit from resident profile | Staff view; coordinator/admin edit |
+| Care tasks | `CareTasksController` | `/care-tasks`, `/my-care-tasks` | Staff/coordinator manage; caregiver sees own tasks |
+| Visit requests | `VisitRequestsController` | `/visit-requests`, `/my-visit-requests` | Coordinator decides; family submits own requests |
+| Activities | `ActivitiesController` | `/activities`, create/edit | Coordinator/admin |
+| User accounts | `UsersController` | `/users`, create/edit | Admin only |
+| Resident media | `ResidentMediaController` | upload on profile | Staff view; coordinator/admin upload/delete |
+| Dashboard | `DashboardController` | `/` (Home) | Operational: admin/coordinator; personal: caregiver/family |
+| Calendar | `CalendarController` | `/calendar` | Staff and family (family sees own visits) |
+| Room occupancy | `RoomsController` | `/room-occupancy` | Staff |
+| Caregiver workload | `CareTasksController` | `/caregiver-workload` | Coordinator/admin (all); caregiver (own) |
+| AI assistant | `AiController` | `/` (summary), `/care-tasks/create` (suggestion) | Coordinator/admin |
+| Lookups | `LookupsController` | — (used by forms) | Staff |
+
+---
+
+## Authorization rules (summary)
 
 - **Staff** — Admin, Coordinator, Caregiver
-- **CoordinatorOrAdmin** — Admin ili Coordinator
-- **AdminOnly** — samo Admin
-- **FamilyMember** — za `/api/VisitRequests/mine`
-- **Caregiver** — za `/api/CareTasks/mine` i izvršavanje zadataka
-- Većina API ruta zahtijeva JWT (`FallbackPolicy`)
+- **CoordinatorOrAdmin** — Admin or Coordinator
+- **AdminOnly** — Admin only
+- **FamilyMember** — for `/api/VisitRequests/mine`
+- **Caregiver** — for `/api/CareTasks/mine` and task execution
+- Most API routes require JWT (`FallbackPolicy`)
 
 ---
 
-## Autorizacijski testovi
+## Authorization tests
 
-Testirano na `http://localhost:5088` (Development, rujan 2026).
+Tested on `http://localhost:5088` (Development, September 2026).
 
-| # | URL | Korisnik | Očekivano | Stvarno | ✓ |
-|---|-----|----------|-----------|---------|---|
-| 1 | `GET /api/health` | — (anonimno) | 200 | 200 | ✓ |
-| 2 | `GET /api/residents` | — (anonimno) | 401 | 401 | ✓ |
+| # | URL | User | Expected | Actual | ✓ |
+|---|-----|------|----------|--------|---|
+| 1 | `GET /api/health` | — (anonymous) | 200 | 200 | ✓ |
+| 2 | `GET /api/residents` | — (anonymous) | 401 | 401 | ✓ |
 | 3 | `GET /api/residents` | admin | 200 | 200 | ✓ |
 | 4 | `GET /api/users` | admin | 200 | 200 | ✓ |
 | 5 | `GET /api/users` | caregiver | 403 | 403 | ✓ |
@@ -122,25 +122,25 @@ Testirano na `http://localhost:5088` (Development, rujan 2026).
 | 8 | `GET /api/dashboard` | family | 200 | 200 | ✓ |
 | 9 | `POST /api/rooms` | caregiver | 403 | 403 | ✓ |
 | 10 | `POST /api/VisitRequests/mine` | family | 201 | 201 | ✓ |
-| 11 | `GET /api/residents` | nevažeći token | 401 | 401 | ✓ |
+| 11 | `GET /api/residents` | invalid token | 401 | 401 | ✓ |
 
-**Pokriveno:** 200, 201, 401, 403 (više od 8 testova, kako traži završni zadatak).
+**Covered:** 200, 201, 401, 403 (more than 8 tests, as required by the final project spec).
 
-### AI testovi (rujan 2026)
+### AI tests (September 2026)
 
-| # | Test | Očekivano | Stvarno | ✓ |
-|---|------|-----------|---------|---|
-| 1 | `GET /api/ai/summary` bez tokena | 401 | 401 | ✓ |
-| 2 | `GET /api/ai/summary` kao caregiver | 403 | 403 | ✓ |
-| 3 | `GET /api/ai/summary` kao family | 403 | 403 | ✓ |
-| 4 | `GET /api/ai/summary` kao coordinator | 200, Provider: Mock | 200 | ✓ |
-| 5 | `POST /api/ai/care-task-suggestion` prazna bilješka | 400 | 400 | ✓ |
-| 6 | Prijedlog: terapija / Mara / Ivan | Terapija, dueAt | 200 | ✓ |
-| 7 | Prijedlog: prehrana | Prehrana | 200 | ✓ |
-| 8 | Prijedlog: higijena | Higijena | 200 | ✓ |
-| 9 | Spremi prijedlog kroz `POST /api/caretasks` | 201 | 201 | ✓ |
+| # | Test | Expected | Actual | ✓ |
+|---|------|----------|--------|---|
+| 1 | `GET /api/ai/summary` without token | 401 | 401 | ✓ |
+| 2 | `GET /api/ai/summary` as caregiver | 403 | 403 | ✓ |
+| 3 | `GET /api/ai/summary` as family | 403 | 403 | ✓ |
+| 4 | `GET /api/ai/summary` as coordinator | 200, Provider: Mock | 200 | ✓ |
+| 5 | `POST /api/ai/care-task-suggestion` empty note | 400 | 400 | ✓ |
+| 6 | Suggestion: therapy / Mara / Ivan | Terapija, dueAt | 200 | ✓ |
+| 7 | Suggestion: nutrition | Prehrana | 200 | ✓ |
+| 8 | Suggestion: hygiene | Higijena | 200 | ✓ |
+| 9 | Save suggestion via `POST /api/caretasks` | 201 | 201 | ✓ |
 
-**Primjer — login i zaštićeni poziv:**
+**Example — login and protected request:**
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:5088/api/auth/login \
@@ -153,7 +153,7 @@ curl -s -o /dev/null -w "%{http_code}\n" \
   http://localhost:5088/api/residents
 ```
 
-**Primjer — AI sažetak:**
+**Example — AI summary:**
 
 ```bash
 TOKEN=$(curl -sk -X POST https://localhost:7210/api/auth/login \
@@ -167,35 +167,41 @@ curl -sk https://localhost:7210/api/ai/summary \
 
 ---
 
-## Migracije baze
+## Database migrations
 
-Alat:
+Tooling:
 
 ```bash
 dotnet tool restore
 dotnet ef database update --project SigurnaDob.Api --startup-project SigurnaDob.Api
 ```
 
-### Test migracija (rujan 2026)
+### Migration test (September 2026)
 
-| Korak | Rezultat |
-|-------|----------|
-| **Rebuild solution** | ✓ 0 grešaka, 0 upozorenja |
-| **`database update 0`** | ✗ SQLite FK greška pri rollbacku seed podataka (`SeedLookupData`) — očekivano ograničenje SQLite-a |
-| **Svježa baza iz migracija** | ✓ Obriši `SigurnaDob.db` (+ `-shm`, `-wal`), pokreni `database update` → obje migracije primijenjene |
-| **Seed nakon pokretanja API-ja** | ✓ Demo korisnici i poslovni podaci dostupni nakon prvog `dotnet run` |
+| Step | Result |
+|------|--------|
+| **Rebuild solution** | ✓ 0 errors, 0 warnings |
+| **`database update 0`** | ✗ SQLite FK error when rolling back seed data (`SeedLookupData`) — expected SQLite limitation |
+| **Fresh database from migrations** | ✓ Delete `SigurnaDob.db` (+ `-shm`, `-wal`), run `database update` → all migrations applied |
+| **Seed after API startup** | ✓ Demo users and business data available after first `dotnet run` |
 
-**Preporučeni postupak za provjeru:**
+**Recommended verification procedure:**
 
 ```bash
 cd SigurnaDob.Api
 rm -f SigurnaDob.db SigurnaDob.db-shm SigurnaDob.db-wal
 dotnet ef database update
 dotnet run --launch-profile http
-# Provjeri login admin@sigurna-dob.local / Admin123!
+# Verify login: admin@sigurna-dob.local / Admin123!
 ```
 
-Lookup tablice dolaze iz migracije `SeedLookupData`. Korisnički računi i demo poslovni podaci seedaju se pri startu API-ja (`Program.cs`).
+Lookup tables come from the `SeedLookupData` migration. User accounts and demo business data are seeded on API startup (`Program.cs`).
+
+Current migrations:
+
+1. `InitialCreate`
+2. `SeedLookupData`
+3. `AddChangeHistory` — adds `ResidentStatusHistories` and `CareTaskChangeHistories`
 
 ---
 
@@ -204,63 +210,62 @@ Lookup tablice dolaze iz migracije `SeedLookupData`. Korisnički računi i demo 
 ```bash
 dotnet clean
 dotnet build
-# Očekivano: 0 Error(s), 0 Warning(s)
+# Expected: 0 Error(s), 0 Warning(s)
 ```
 
 ---
 
-## Git repozitorij
+## Git repository
 
 Remote: `git@github.com:Tin922/Sigurna-Dob.git`
 
 ---
 
-## Napomene za predaju
+## Submission notes
 
-- Lokalna SQLite baza (`*.db`) i upload datoteke **nisu** u repozitoriju (`.gitignore`)
-- DBML model: `sigurna-dob.dbml` — export slike za dokumentaciju s [dbdiagram.io](https://dbdiagram.io)
-- Upute projekta: `Instrucitons.md` (lokalno, nije u gitu)
+- Local SQLite database (`*.db`) and uploaded files are **not** in the repository (`.gitignore`)
+- DBML model: `sigurna-dob.dbml` — export a diagram image from [dbdiagram.io](https://dbdiagram.io)
 
 ---
 
-## Bonus funkcionalnosti
+## Bonus features
 
-### 1. Povijest promjena
+### 1. Change history
 
-- **Povijest statusa korisnika** — `GET /api/residents/{id}/status-history`, prikaz na profilu korisnika
-- **Povijest zadatka** — status i dodjela njegovatelja; `GET /api/caretasks/{id}/history`, prikaz na stranici uređivanja zadatka
-- Promjene se bilježe pri kreiranju, uređivanju, pokretanju i završetku zadatka te pri promjeni statusa korisnika doma
+- **Resident status history** — `GET /api/residents/{id}/status-history`, shown on the resident profile
+- **Care task history** — status and caregiver assignment; `GET /api/caretasks/{id}/history`, shown on the task edit page
+- Changes are recorded when tasks are created, updated, started, or completed, and when a resident status changes
 
-### 2. Kalendar posjeta i aktivnosti
+### 2. Calendar of visits and activities
 
 - `GET /api/calendar?from=...&to=...`
-- Stranica `/calendar` — mjesečni prikaz posjeta i aktivnosti
-- Staff vidi posjete i aktivnosti; član obitelji vidi svoje planirane posjete
-- Klik na dan prikazuje detalje i link na pripadajući modul
+- Page `/calendar` — monthly view of visits and activities
+- Staff see visits and activities; family members see their own planned visits
+- Clicking a day shows details and a link to the related module
 
-### 3. Popunjenost soba i opterećenje njegovatelja
+### 3. Room occupancy and caregiver workload
 
 - `GET /api/rooms/occupancy` → `/room-occupancy`
 - `GET /api/caretasks/workload` → `/caregiver-workload`
-- Koordinator/admin vidi sve njegovatelje; njegovatelj vidi vlastito opterećenje
+- Coordinator/admin see all caregivers; a caregiver sees their own workload
 
-### 4. Mobilni prikaz i pristupačnost
+### 4. Mobile layout and accessibility
 
-- Responzivni drawer s hamburger izbornikom (mobitel) i trajno otvorenim izbornikom (desktop)
-- Skip link na sadržaj, `theme-color`, `:focus-visible` stilovi
-- Tablice ostaju u normalnom prikazu na malim ekranima (`Breakpoint.None`) s horizontalnim scrollom
-- Kalendar se horizontalno scrolla na uskim ekranima
+- Responsive drawer with hamburger menu (mobile) and persistent sidebar (desktop)
+- Skip link to content, `theme-color`, `:focus-visible` styles
+- Tables stay in normal layout on small screens (`Breakpoint.None`) with horizontal scroll
+- Calendar scrolls horizontally on narrow screens
 
-### 5. AI funkcionalnosti
+### 5. AI features
 
-**Arhitektura**
+**Architecture**
 
-- `IAiService` u API-ju — odvojen od Blazor aplikacije
-- **`MockAiService`** (zadano) — radi bez vanjskog API ključa
-- **`OpenAiAiService`** (opcionalno) — biranje konfiguracijom
-- Tajni ključ **nije** u Blazor projektu ni Git repozitoriju
+- `IAiService` in the API — separated from the Blazor app
+- **`MockAiService`** (default) — works without an external API key
+- **`OpenAiAiService`** (optional) — selected via configuration
+- Secret key is **not** stored in the Blazor project or Git repository
 
-**Konfiguracija** (`SigurnaDob.Api/appsettings.json`):
+**Configuration** (`SigurnaDob.Api/appsettings.json`):
 
 ```json
 "Ai": {
@@ -270,7 +275,7 @@ Remote: `git@github.com:Tin922/Sigurna-Dob.git`
 }
 ```
 
-Za stvarni OpenAI provider (opcionalno):
+For the real OpenAI provider (optional):
 
 ```bash
 dotnet user-secrets set "Ai:Provider" "OpenAI" --project SigurnaDob.Api
@@ -279,20 +284,20 @@ dotnet user-secrets set "Ai:ApiKey" "sk-..." --project SigurnaDob.Api
 
 **API**
 
-| Endpoint | Opis | Tko |
-|----------|------|-----|
-| `GET /api/ai/summary` | Tekstualni sažetak otvorenih zadataka i posjeta na odluku | Koordinator/admin |
-| `POST /api/ai/care-task-suggestion` | Strukturirani prijedlog zadatka iz kratke bilješke | Koordinator/admin |
+| Endpoint | Description | Who |
+|----------|-------------|-----|
+| `GET /api/ai/summary` | Text summary of open tasks and pending visit requests | Coordinator/admin |
+| `POST /api/ai/care-task-suggestion` | Structured care task suggestion from a short note | Coordinator/admin |
 
 **UI**
 
-- **Home** (`/`) — panel „AI sažetak” s gumbom „Generiraj sažetak”
-- **Novi zadatak** (`/care-tasks/create`) — AI pomoćnik: unos bilješke → prijedlog → pregled → primijeni/odbaci → ručno uređivanje → spremi kroz postojeći `POST /api/caretasks`
+- **Home** (`/`) — “AI summary” panel with a “Generate summary” button
+- **New care task** (`/care-tasks/create`) — AI assistant: enter note → generate → review → apply/discard → edit manually → save through existing `POST /api/caretasks`
 
-**Primjer bilješke za prijedlog:**
+**Example note for a suggestion:**
 
 ```
 Mara treba terapiju sutra ujutro, dodijeli Ivanu
 ```
 
-Mock AI prepoznaje korisnika (Mara), vrstu (Terapija), njegovatelja (Ivan) i rok (sutra).
+Mock AI recognizes the resident (Mara), task type (Terapija), caregiver (Ivan), and due date (tomorrow).
