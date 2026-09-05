@@ -118,6 +118,47 @@ else
                         Opterećenje njegovatelja
                     </MudButton>
                 </MudStack>
+
+                <MudPaper Class="pa-4 content-card ai-summary-panel mb-5" Elevation="0">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6" Class="page-title">AI sažetak</MudText>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.AutoAwesome"
+                                   Disabled="aiSummaryLoading"
+                                   OnClick="LoadAiSummaryAsync">
+                            @(aiSummaryLoading ? "Generiranje..." : "Generiraj sažetak")
+                        </MudButton>
+                    </MudStack>
+
+                    @if (!string.IsNullOrWhiteSpace(aiSummaryError))
+                    {
+                        <MudAlert Severity="Severity.Error" Class="mb-3">@aiSummaryError</MudAlert>
+                    }
+
+                    @if (aiSummaryLoading)
+                    {
+                        <div class="d-flex justify-center py-4">
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(aiSummary))
+                    {
+                        <MudText Typo="Typo.body2" Class="ai-summary-text mb-3">@aiSummary</MudText>
+                        @if (!string.IsNullOrWhiteSpace(aiSummaryProvider))
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                Provider: @aiSummaryProvider
+                            </MudChip>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="page-subtitle">
+                            Generirajte tekstualni pregled otvorenih zadataka i posjeta koji čekaju odluku.
+                        </MudText>
+                    }
+                </MudPaper>
             }
         }
 
@@ -253,6 +294,10 @@ else
     private bool isLoading;
     private string? errorMessage;
     private bool authReady;
+    private bool aiSummaryLoading;
+    private string? aiSummary;
+    private string? aiSummaryProvider;
+    private string? aiSummaryError;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -287,6 +332,29 @@ else
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task LoadAiSummaryAsync()
+    {
+        aiSummaryLoading = true;
+        aiSummaryError = null;
+
+        try
+        {
+            var response = await Http.GetFromJsonAsync<AiSummaryResponseDto>("api/ai/summary");
+            aiSummary = response?.Summary;
+            aiSummaryProvider = response?.Provider;
+        }
+        catch (Exception)
+        {
+            aiSummary = null;
+            aiSummaryProvider = null;
+            aiSummaryError = "AI sažetak trenutno nije dostupan.";
+        }
+        finally
+        {
+            aiSummaryLoading = false;
         }
     }
 }

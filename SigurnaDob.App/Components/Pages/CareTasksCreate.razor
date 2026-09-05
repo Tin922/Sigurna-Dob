@@ -20,6 +20,68 @@
     <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
 }
 
+<MudPaper Class="pa-4 content-card ai-assistant-panel mb-4" Elevation="0">
+    <MudText Typo="Typo.subtitle1" Class="page-title mb-1">AI pomoćnik</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle mb-3">
+        Unesite kratku bilješku, generirajte prijedlog zadatka, pregledajte ga i tek onda spremite.
+    </MudText>
+
+    <MudTextField @bind-Value="aiNote"
+                  Label="Kratka bilješka"
+                  Placeholder="npr. Mara treba terapiju sutra ujutro, dodijeli Ivanu"
+                  Lines="3"
+                  Immediate="true"
+                  Variant="Variant.Outlined"
+                  Class="mb-3" />
+
+    <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Outlined.AutoAwesome"
+                   Disabled="aiSuggestionLoading"
+                   OnClick="GenerateSuggestionAsync">
+            @(aiSuggestionLoading ? "Generiranje..." : "Generiraj prijedlog")
+        </MudButton>
+    </MudStack>
+
+    @if (!string.IsNullOrWhiteSpace(aiSuggestionError))
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-3">@aiSuggestionError</MudAlert>
+    }
+
+    @if (suggestion is not null)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4 mb-3">
+            Pregledajte AI prijedlog. Možete ga primijeniti u formu, izmijeniti ili odbaciti prije spremanja.
+        </MudAlert>
+
+        <MudPaper Class="pa-3 ai-suggestion-preview" Elevation="0">
+            <MudText Typo="Typo.subtitle2" Class="page-title mb-2">@suggestion.Title</MudText>
+            <MudText Typo="Typo.body2" Class="page-subtitle mb-2">@suggestion.Description</MudText>
+            <MudText Typo="Typo.caption" Class="page-subtitle">
+                Korisnik: @suggestion.ResidentName · Vrsta: @suggestion.TypeName
+                @if (!string.IsNullOrWhiteSpace(suggestion.CaregiverName))
+                {
+                    <text> · Njegovatelj: @suggestion.CaregiverName</text>
+                }
+                @if (suggestion.DueAt.HasValue)
+                {
+                    <text> · Rok: @suggestion.DueAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</text>
+                }
+            </MudText>
+        </MudPaper>
+
+        <MudStack Row="true" Spacing="2" Class="mt-3" Wrap="Wrap.Wrap">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplySuggestion">
+                Primijeni prijedlog
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="DiscardSuggestion">
+                Odbaci
+            </MudButton>
+        </MudStack>
+    }
+</MudPaper>
+
 <MudStack Spacing="2" Style="max-width: 560px">
     <MudTextField @bind-Value="model.Title" Label="Naslov" Required="true" Variant="Variant.Outlined" />
     <MudTextField @bind-Value="model.Description" Label="Opis" Lines="3" Variant="Variant.Outlined" />
@@ -87,6 +149,10 @@
     private bool isSaving;
     private string? errorMessage;
     private bool authReady;
+    private string? aiNote;
+    private bool aiSuggestionLoading;
+    private string? aiSuggestionError;
+    private AiCareTaskSuggestionDto? suggestion;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -111,6 +177,71 @@
             model.ResidentId = residents[0].Id;
 
         StateHasChanged();
+    }
+
+    private async Task GenerateSuggestionAsync()
+    {
+        aiSuggestionError = null;
+
+        if (string.IsNullOrWhiteSpace(aiNote))
+        {
+            aiSuggestionError = "Unesite kratku bilješku prije generiranja prijedloga.";
+            return;
+        }
+
+        aiSuggestionLoading = true;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                "api/ai/care-task-suggestion",
+                new AiCareTaskSuggestionRequestDto { Note = aiNote ?? string.Empty });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                aiSuggestionError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(aiSuggestionError))
+                    aiSuggestionError = "Generiranje prijedloga nije uspjelo.";
+                suggestion = null;
+                return;
+            }
+
+            suggestion = await response.Content.ReadFromJsonAsync<AiCareTaskSuggestionDto>();
+        }
+        catch (Exception ex)
+        {
+            aiSuggestionError = ex.Message;
+            suggestion = null;
+        }
+        finally
+        {
+            aiSuggestionLoading = false;
+        }
+    }
+
+    private void ApplySuggestion()
+    {
+        if (suggestion is null)
+            return;
+
+        model.Title = suggestion.Title;
+        model.Description = suggestion.Description;
+        model.ResidentId = suggestion.ResidentId;
+        model.CareTaskTypeId = suggestion.CareTaskTypeId;
+        model.CaregiverId = suggestion.CaregiverId;
+
+        if (suggestion.DueAt.HasValue)
+        {
+            var local = suggestion.DueAt.Value.ToLocalTime();
+            dueDate = local.Date;
+            dueTime = local.TimeOfDay;
+        }
+    }
+
+    private void DiscardSuggestion()
+    {
+        suggestion = null;
+        aiSuggestionError = null;
     }
 
     private async Task Save()

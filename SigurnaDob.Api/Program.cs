@@ -8,6 +8,7 @@ using SigurnaDob.Api.Configuration;
 using SigurnaDob.Api.Data;
 using SigurnaDob.Api.Security;
 using SigurnaDob.Api.Services;
+using SigurnaDob.Api.Services.Ai;
 using SigurnaDob.Api.Swagger;
 using SigurnaDob.Shared.Constants;
 
@@ -54,6 +55,14 @@ builder.Services.AddScoped<ChangeHistoryService>();
 builder.Services.AddScoped<CalendarService>();
 builder.Services.AddScoped<RoomOccupancyService>();
 builder.Services.AddScoped<CaregiverWorkloadService>();
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection(AiOptions.SectionName));
+builder.Services.AddScoped<AiInsightsService>();
+
+var aiProvider = builder.Configuration.GetSection(AiOptions.SectionName).GetValue<string>("Provider") ?? "Mock";
+if (string.Equals(aiProvider, "OpenAI", StringComparison.OrdinalIgnoreCase))
+    builder.Services.AddHttpClient<IAiService, OpenAiAiService>();
+else
+    builder.Services.AddScoped<IAiService, MockAiService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

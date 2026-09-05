@@ -411,6 +411,25 @@ h1:focus {
     padding-bottom: 0.35rem;
 }
 
+.ai-summary-panel,
+.ai-assistant-panel {
+    border: 1px solid #E5DDD3;
+    border-radius: 14px;
+    background: #FFFFFF;
+}
+
+.ai-summary-text {
+    white-space: pre-line;
+    color: #2C3333;
+    line-height: 1.55;
+}
+
+.ai-suggestion-preview {
+    border: 1px dashed #B8CECE;
+    background: #F8FBFB;
+    border-radius: 12px;
+}
+
 .skip-link {
     position: absolute;
     left: -9999px;
