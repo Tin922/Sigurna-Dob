@@ -107,6 +107,18 @@ else
                     </MudPaper>
                 </MudItem>
             </MudGrid>
+
+            @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
+            {
+                <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap" Class="mb-5">
+                    <MudButton Href="/room-occupancy" Variant="Variant.Outlined" Color="Color.Primary">
+                        Popunjenost soba
+                    </MudButton>
+                    <MudButton Href="/caregiver-workload" Variant="Variant.Outlined" Color="Color.Primary">
+                        Opterećenje njegovatelja
+                    </MudButton>
+                </MudStack>
+            }
         }
 
         @if (dashboard.Personal is not null &&
@@ -129,6 +141,13 @@ else
                                        Size="Size.Small"
                                        Class="mt-2 px-0">
                                 Otvori zadatke
+                            </MudButton>
+                            <MudButton Href="/caregiver-workload"
+                                       Variant="Variant.Text"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Class="px-0">
+                                Moje opterećenje
                             </MudButton>
                         </MudPaper>
                     </MudItem>
@@ -209,9 +228,14 @@ else
                         <MudText Typo="Typo.body2" Class="mb-4 page-subtitle">
                             Kapacitet, popunjenost i status soba u domu.
                         </MudText>
-                        <MudButton Href="/rooms" Variant="Variant.Filled" Color="Color.Secondary">
-                            Otvori
-                        </MudButton>
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Href="/rooms" Variant="Variant.Filled" Color="Color.Secondary">
+                                Sobe
+                            </MudButton>
+                            <MudButton Href="/room-occupancy" Variant="Variant.Outlined" Color="Color.Primary">
+                                Popunjenost
+                            </MudButton>
+                        </MudStack>
                     </MudPaper>
                 </MudItem>
             </MudGrid>

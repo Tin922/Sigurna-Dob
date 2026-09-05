@@ -18,13 +18,16 @@ public class CareTasksController : ControllerBase
 {
     private readonly SigurnaDobDbContext _context;
     private readonly ChangeHistoryService _changeHistory;
+    private readonly CaregiverWorkloadService _caregiverWorkloadService;
 
     public CareTasksController(
         SigurnaDobDbContext context,
-        ChangeHistoryService changeHistory)
+        ChangeHistoryService changeHistory,
+        CaregiverWorkloadService caregiverWorkloadService)
     {
         _context = context;
         _changeHistory = changeHistory;
+        _caregiverWorkloadService = caregiverWorkloadService;
     }
 
     [Authorize(Policy = AuthorizationPolicies.CoordinatorOrAdmin)]
@@ -74,6 +77,17 @@ public class CareTasksController : ControllerBase
 
         var tasks = await query.ToListAsync();
         return Ok(tasks.Select(task => ToDto(task)).ToList());
+    }
+
+    [HttpGet("workload")]
+    public async Task<ActionResult<CaregiverWorkloadOverviewDto>> GetCaregiverWorkload()
+    {
+        if (!User.IsInRole(AppRoles.Admin) &&
+            !User.IsInRole(AppRoles.Coordinator) &&
+            !User.IsInRole(AppRoles.Caregiver))
+            return Forbid();
+
+        return Ok(await _caregiverWorkloadService.GetOverviewAsync(User));
     }
 
     [Authorize(Roles = AppRoles.Caregiver)]

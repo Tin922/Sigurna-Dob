@@ -83,7 +83,18 @@ else
             <MudTd>@context.Name</MudTd>
             <MudTd>@context.StatusName</MudTd>
             <MudTd>@context.Capacity</MudTd>
-            <MudTd>@context.Occupancy</MudTd>
+            <MudTd>
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.body2">@context.Occupancy</MudText>
+                    @if (context.Capacity > 0)
+                    {
+                        <MudProgressLinear Value="@GetOccupancyPercent(context)"
+                                           Color="@GetOccupancyColor(context)"
+                                           Rounded="true"
+                                           Class="occupancy-progress" />
+                    }
+                </MudStack>
+            </MudTd>
             <MudTd>@context.AvailableSpots</MudTd>
             <MudTd>
                 @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
@@ -163,5 +174,16 @@ else
         search = null;
         statusId = null;
         await LoadRooms();
+    }
+
+    private static int GetOccupancyPercent(RoomDto room) =>
+        room.Capacity <= 0 ? 0 : (int)Math.Min(100, Math.Round(room.Occupancy * 100.0 / room.Capacity));
+
+    private static Color GetOccupancyColor(RoomDto room)
+    {
+        if (room.Occupancy >= room.Capacity)
+            return Color.Error;
+
+        return GetOccupancyPercent(room) >= 75 ? Color.Warning : Color.Success;
     }
 }

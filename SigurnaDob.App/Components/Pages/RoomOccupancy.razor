@@ -1,0 +1,233 @@
+@page "/room-occupancy"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Popunjenost soba</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Popunjenost soba</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">
+        Pregled kapaciteta, zauzetosti i korisnika po sobama
+    </MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (overview is not null)
+{
+    <MudGrid Spacing="3" Class="mb-5">
+        <MudItem xs="6" sm="4" md="2">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon rooms">
+                    <MudIcon Icon="@Icons.Material.Outlined.MeetingRoom" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.RoomsInUse</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Sobe u uporabi</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon residents">
+                    <MudIcon Icon="@Icons.Material.Outlined.Hotel" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.TotalCapacity</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Ukupni kapacitet</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon tasks">
+                    <MudIcon Icon="@Icons.Material.Outlined.Person" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.TotalOccupancy</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Smješteno</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon visits">
+                    <MudIcon Icon="@Icons.Material.Outlined.EventSeat" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.AvailableSpots</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Slobodna mjesta</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon overdue">
+                    <MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.FullRooms</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Pune sobe</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="2">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon rooms">
+                    <MudIcon Icon="@Icons.Material.Outlined.CheckCircleOutline" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.EmptyRooms</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Prazne sobe</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="3">
+        @foreach (var room in overview.Rooms)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudPaper Class="@($"pa-4 occupancy-room-card {GetRoomCardClass(room)}")" Elevation="0">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-2">
+                        <div>
+                            <MudText Typo="Typo.h6" Class="occupancy-room-title">@room.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="page-subtitle">@room.StatusName</MudText>
+                        </div>
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Variant="Variant.Outlined"
+                                 Class="@GetOccupancyChipClass(room)">
+                            @room.Occupancy / @room.Capacity
+                        </MudChip>
+                    </MudStack>
+
+                    <MudProgressLinear Value="@room.OccupancyPercent"
+                                       Color="@GetProgressColor(room)"
+                                       Class="occupancy-progress mb-3"
+                                       Rounded="true" />
+
+                    <MudText Typo="Typo.caption" Class="page-subtitle mb-2">
+                        @if (room.RoomStatusId != RoomStatusIds.InUse)
+                        {
+                            <text>Soba nije dostupna za smještaj</text>
+                        }
+                        else if (room.IsFull)
+                        {
+                            <text>Puna — nema slobodnih mjesta</text>
+                        }
+                        else
+                        {
+                            <text>@room.AvailableSpots slobodno mjest@(room.AvailableSpots == 1 ? "o" : "a")</text>
+                        }
+                    </MudText>
+
+                    @if (room.Occupants.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="page-subtitle">Nema smještenih korisnika.</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="1">
+                            @foreach (var occupant in room.Occupants)
+                            {
+                                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Person" Size="Size.Small" Class="page-subtitle" />
+                                    <MudLink Href="@($"/residents/{occupant.Id}")" Typo="Typo.body2">
+                                        @occupant.FirstName @occupant.LastName
+                                    </MudLink>
+                                    <MudText Typo="Typo.caption" Class="page-subtitle">(@occupant.StatusName)</MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+                    }
+
+                    <MudButton Variant="Variant.Text"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Class="px-0 mt-3"
+                               Href="/rooms">
+                        Popis soba
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private RoomOccupancyOverviewDto? overview;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        authReady = true;
+        await LoadOverview();
+        StateHasChanged();
+    }
+
+    private async Task LoadOverview()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            overview = await Http.GetFromJsonAsync<RoomOccupancyOverviewDto>("api/rooms/occupancy");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Pregled popunjenosti nije moguće učitati: {ex.Message}";
+            overview = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetRoomCardClass(RoomOccupancyItemDto room)
+    {
+        if (room.RoomStatusId != RoomStatusIds.InUse)
+            return "unavailable";
+
+        if (room.IsFull)
+            return "full";
+
+        return room.OccupancyPercent >= 75 ? "high" : string.Empty;
+    }
+
+    private static string GetOccupancyChipClass(RoomOccupancyItemDto room) =>
+        room.RoomStatusId != RoomStatusIds.InUse
+            ? "occupancy-chip unavailable"
+            : room.IsFull
+                ? "occupancy-chip full"
+                : "occupancy-chip";
+
+    private static Color GetProgressColor(RoomOccupancyItemDto room)
+    {
+        if (room.RoomStatusId != RoomStatusIds.InUse)
+            return Color.Default;
+
+        if (room.IsFull)
+            return Color.Error;
+
+        return room.OccupancyPercent >= 75 ? Color.Warning : Color.Success;
+    }
+}

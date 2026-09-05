@@ -48,12 +48,20 @@
                     <MudNavLink Href="/rooms" Icon="@Icons.Material.Filled.MeetingRoom">
                         Sobe
                     </MudNavLink>
+
+                    <MudNavLink Href="/room-occupancy" Icon="@Icons.Material.Filled.BarChart">
+                        Popunjenost soba
+                    </MudNavLink>
                 }
 
                 @if (CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator))
                 {
                     <MudNavLink Href="/care-tasks" Icon="@Icons.Material.Filled.Assignment">
                         Zadaci skrbi
+                    </MudNavLink>
+
+                    <MudNavLink Href="/caregiver-workload" Icon="@Icons.Material.Filled.StackedBarChart">
+                        Opterećenje njegovatelja
                     </MudNavLink>
 
                     <MudNavLink Href="/visit-requests" Icon="@Icons.Material.Filled.EventAvailable">
@@ -76,6 +84,10 @@
                 {
                     <MudNavLink Href="/my-care-tasks" Icon="@Icons.Material.Filled.TaskAlt">
                         Moji zadaci
+                    </MudNavLink>
+
+                    <MudNavLink Href="/caregiver-workload" Icon="@Icons.Material.Filled.StackedBarChart">
+                        Moje opterećenje
                     </MudNavLink>
                 }
 

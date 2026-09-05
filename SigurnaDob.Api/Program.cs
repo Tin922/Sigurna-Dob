@@ -52,6 +52,8 @@ builder.Services.AddScoped<ResidentMediaStorageService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ChangeHistoryService>();
 builder.Services.AddScoped<CalendarService>();
+builder.Services.AddScoped<RoomOccupancyService>();
+builder.Services.AddScoped<CaregiverWorkloadService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -15,11 +15,19 @@ namespace SigurnaDob.Api.Controllers;
 public class RoomsController : ControllerBase
 {
     private readonly SigurnaDobDbContext _context;
+    private readonly RoomOccupancyService _roomOccupancyService;
 
-    public RoomsController(SigurnaDobDbContext context)
+    public RoomsController(
+        SigurnaDobDbContext context,
+        RoomOccupancyService roomOccupancyService)
     {
         _context = context;
+        _roomOccupancyService = roomOccupancyService;
     }
+
+    [HttpGet("occupancy")]
+    public async Task<ActionResult<RoomOccupancyOverviewDto>> GetOccupancyOverview() =>
+        Ok(await _roomOccupancyService.GetOverviewAsync());
 
     [HttpGet]
     public async Task<ActionResult<List<RoomDto>>> GetRooms(

@@ -307,3 +307,81 @@ h1:focus {
 .calendar-day-detail {
     width: 100%;
 }
+
+.occupancy-room-card {
+    border: 1px solid #E5DDD3;
+    border-radius: 12px;
+    background: #FFFFFF;
+    height: 100%;
+}
+
+.occupancy-room-card.full {
+    border-color: rgba(196, 92, 92, 0.35);
+}
+
+.occupancy-room-card.high {
+    border-color: rgba(237, 162, 74, 0.45);
+}
+
+.occupancy-room-card.unavailable {
+    background: #F8F5F0;
+    opacity: 0.92;
+}
+
+.occupancy-room-title {
+    font-weight: 700 !important;
+    color: #1E4545;
+}
+
+.occupancy-progress {
+    height: 8px;
+}
+
+.occupancy-chip {
+    background: rgba(45, 106, 106, 0.1) !important;
+    color: #1E4545 !important;
+}
+
+.occupancy-chip.full {
+    background: rgba(196, 92, 92, 0.12) !important;
+    color: #B71C1C !important;
+}
+
+.occupancy-chip.unavailable {
+    background: rgba(92, 107, 107, 0.12) !important;
+    color: #5C6B6B !important;
+}
+
+.workload-caregiver-card {
+    border: 1px solid #E5DDD3;
+    border-radius: 12px;
+    background: #FFFFFF;
+    height: 100%;
+}
+
+.workload-caregiver-card.high {
+    border-color: rgba(196, 92, 92, 0.35);
+}
+
+.workload-caregiver-card.medium {
+    border-color: rgba(237, 162, 74, 0.45);
+}
+
+.workload-chip {
+    background: rgba(45, 106, 106, 0.1) !important;
+    color: #1E4545 !important;
+}
+
+.workload-chip.high {
+    background: rgba(196, 92, 92, 0.12) !important;
+    color: #B71C1C !important;
+}
+
+.workload-chip.medium {
+    background: rgba(237, 162, 74, 0.14) !important;
+    color: #E65100 !important;
+}
+
+.workload-task-row {
+    padding-bottom: 0.35rem;
+}

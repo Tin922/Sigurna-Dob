@@ -1,0 +1,244 @@
+@page "/caregiver-workload"
+@rendermode InteractiveServer
+
+@using SigurnaDob.App.Services
+@using SigurnaDob.Shared.Constants
+@using SigurnaDob.Shared.Dtos
+
+@inject HttpClient Http
+@inject CurrentUserService CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Opterećenje njegovatelja</PageTitle>
+
+<div class="page-header">
+    <MudText Typo="Typo.h4" Class="page-title">Opterećenje njegovatelja</MudText>
+    <MudText Typo="Typo.body2" Class="page-subtitle">
+        Pregled otvorenih zadataka, zakašnjelih obaveza i neraspodijeljenog posla
+    </MudText>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+}
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (overview is not null)
+{
+    <MudGrid Spacing="3" Class="mb-5">
+        <MudItem xs="6" sm="4" md="@(canViewAll ? 2 : 4)">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon tasks">
+                    <MudIcon Icon="@Icons.Material.Outlined.Groups" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.ActiveCaregivers</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Aktivni njegovatelji</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="4" md="@(canViewAll ? 2 : 4)">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon residents">
+                    <MudIcon Icon="@Icons.Material.Outlined.Assignment" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.TotalOpenTasks</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Otvoreni zadaci</MudText>
+            </MudPaper>
+        </MudItem>
+        @if (canViewAll)
+        {
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                    <div class="dashboard-stat-icon visits">
+                        <MudIcon Icon="@Icons.Material.Outlined.PersonOff" Size="Size.Small" />
+                    </div>
+                    <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.UnassignedOpenTasks</MudText>
+                    <MudText Typo="Typo.caption" Class="dashboard-stat-label">Nedodijeljeno</MudText>
+                </MudPaper>
+            </MudItem>
+        }
+        <MudItem xs="6" sm="4" md="@(canViewAll ? 2 : 4)">
+            <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                <div class="dashboard-stat-icon overdue">
+                    <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Small" />
+                </div>
+                <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.TotalOverdueTasks</MudText>
+                <MudText Typo="Typo.caption" Class="dashboard-stat-label">Zakašnjelo</MudText>
+            </MudPaper>
+        </MudItem>
+        @if (canViewAll)
+        {
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Class="pa-4 dashboard-stat-card" Elevation="0">
+                    <div class="dashboard-stat-icon overdue">
+                        <MudIcon Icon="@Icons.Material.Outlined.TrendingUp" Size="Size.Small" />
+                    </div>
+                    <MudText Typo="Typo.h4" Class="dashboard-stat-value">@overview.Summary.HighLoadCaregivers</MudText>
+                    <MudText Typo="Typo.caption" Class="dashboard-stat-label">Visoko opterećeni</MudText>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <MudGrid Spacing="3" Class="mb-5">
+        @foreach (var caregiver in overview.Caregivers)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudPaper Class="@($"pa-4 workload-caregiver-card {caregiver.WorkloadLevel}")" Elevation="0">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-2">
+                        <div>
+                            <MudText Typo="Typo.h6" Class="occupancy-room-title">@caregiver.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="page-subtitle">@GetWorkloadLabel(caregiver.WorkloadLevel)</MudText>
+                        </div>
+                        <MudChip T="string"
+                                 Size="Size.Small"
+                                 Variant="Variant.Outlined"
+                                 Class="@($"workload-chip {caregiver.WorkloadLevel}")">
+                            @caregiver.OpenTasks otvorenih
+                        </MudChip>
+                    </MudStack>
+
+                    <MudProgressLinear Value="@caregiver.WorkloadPercent"
+                                       Color="@GetProgressColor(caregiver.WorkloadLevel)"
+                                       Class="occupancy-progress mb-3"
+                                       Rounded="true" />
+
+                    <MudStack Row="true" Spacing="2" Class="mb-3">
+                        <MudText Typo="Typo.caption" Class="page-subtitle">Dodijeljeno: @caregiver.AssignedTasks</MudText>
+                        <MudText Typo="Typo.caption" Class="page-subtitle">U tijeku: @caregiver.InProgressTasks</MudText>
+                        @if (caregiver.OverdueTasks > 0)
+                        {
+                            <MudText Typo="Typo.caption" Style="color: #B71C1C">Zakašnjelo: @caregiver.OverdueTasks</MudText>
+                        }
+                    </MudStack>
+
+                    @if (caregiver.Tasks.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="page-subtitle">Nema otvorenih zadataka.</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="1">
+                            @foreach (var task in caregiver.Tasks.Take(5))
+                            {
+                                <div class="workload-task-row">
+                                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mb-1">
+                                        @if (task.IsOverdue)
+                                        {
+                                            <MudIcon Icon="@Icons.Material.Outlined.Warning" Size="Size.Small" Style="color: #B71C1C" />
+                                        }
+                                        <MudLink Href="@GetTaskLink(task.Id)" Typo="Typo.body2">@task.Title</MudLink>
+                                    </MudStack>
+                                    <MudText Typo="Typo.caption" Class="page-subtitle">
+                                        @task.StatusName · @task.ResidentName
+                                        @if (task.DueAt.HasValue)
+                                        {
+                                            <text> · @task.DueAt.Value.ToLocalTime().ToString("dd.MM. HH:mm")</text>
+                                        }
+                                    </MudText>
+                                </div>
+                            }
+                            @if (caregiver.Tasks.Count > 5)
+                            {
+                                <MudText Typo="Typo.caption" Class="page-subtitle">+@(caregiver.Tasks.Count - 5) dodatnih zadataka</MudText>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @if (canViewAll && overview.UnassignedTasks.Count > 0)
+    {
+        <MudPaper Class="pa-4 content-card" Elevation="0">
+            <MudText Typo="Typo.h6" Class="mb-3 page-title">Nedodijeljeni zadaci</MudText>
+            <MudList T="CaregiverWorkloadTaskDto" Dense="true">
+                @foreach (var task in overview.UnassignedTasks)
+                {
+                    <MudListItem>
+                        <div class="workload-task-row">
+                            <MudLink Href="@($"/care-tasks/edit/{task.Id}")" Typo="Typo.body2">@task.Title</MudLink>
+                            <MudText Typo="Typo.caption" Class="page-subtitle">
+                                @task.StatusName · @task.ResidentName
+                                @if (task.DueAt.HasValue)
+                                {
+                                    <text> · @task.DueAt.Value.ToLocalTime().ToString("dd.MM. HH:mm")</text>
+                                }
+                            </MudText>
+                        </div>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        </MudPaper>
+    }
+}
+
+@code {
+    private CaregiverWorkloadOverviewDto? overview;
+    private bool isLoading = true;
+    private bool canViewAll;
+    private string? errorMessage;
+    private bool authReady;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || authReady)
+            return;
+
+        if (!await PageAuth.EnsureLoggedInAsync(CurrentUser, Navigation))
+            return;
+
+        if (!CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator, AppRoles.Caregiver))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        canViewAll = CurrentUser.HasAnyRole(AppRoles.Admin, AppRoles.Coordinator);
+        authReady = true;
+        await LoadOverview();
+        StateHasChanged();
+    }
+
+    private async Task LoadOverview()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            overview = await Http.GetFromJsonAsync<CaregiverWorkloadOverviewDto>("api/caretasks/workload");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Pregled opterećenja nije moguće učitati: {ex.Message}";
+            overview = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetTaskLink(int taskId) =>
+        canViewAll ? $"/care-tasks/edit/{taskId}" : $"/my-care-tasks";
+
+    private static string GetWorkloadLabel(string level) => level switch
+    {
+        "high" => "Visoko opterećenje",
+        "medium" => "Umjereno opterećenje",
+        _ => "Nisko opterećenje"
+    };
+
+    private static Color GetProgressColor(string level) => level switch
+    {
+        "high" => Color.Error,
+        "medium" => Color.Warning,
+        _ => Color.Success
+    };
+}
